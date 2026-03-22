@@ -35,14 +35,17 @@ void setup() {
   initSerialDebug();
   initBacklight();
   initBatteryAdc();
+  loadPlaceholderNews();
   initWifiTime();
   updateWeatherData();
+  updateNewsData();
   initDisplay();
   drawInitialScreen();
 }
 
 void loop() {
   updateWeatherData();
+  updateNewsData();
   updateHeaderArea();
   updateBatteryArea();
   updateCenterArea();

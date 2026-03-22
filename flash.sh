@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-set -e
+set -euo pipefail
 
 FQBN="esp32:esp32:d32_pro:PartitionScheme=no_ota"
 PORT="/dev/cu.wchusbserial21440"
@@ -10,6 +10,7 @@ FLASH_SIZE="16MB"
 APP_MAX_BYTES="8388608"
 
 echo "Compilo lo sketch..."
+rm -rf "$BUILD_PATH"
 arduino-cli compile --fqbn "$FQBN" --build-property "build.flash_size=$FLASH_SIZE" --build-property "upload.maximum_size=$APP_MAX_BYTES" --build-path "$BUILD_PATH" . | tee "$BUILD_LOG"
 
 FLASH_LINE=$(grep -E "Sketch uses|Lo sketch usa" "$BUILD_LOG" | head -n 1 || true)
