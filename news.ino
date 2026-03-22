@@ -36,11 +36,13 @@ void setup() {
   initBacklight();
   initBatteryAdc();
   initWifiTime();
+  updateWeatherData();
   initDisplay();
   drawInitialScreen();
 }
 
 void loop() {
+  updateWeatherData();
   updateHeaderArea();
   updateBatteryArea();
   updateCenterArea();
