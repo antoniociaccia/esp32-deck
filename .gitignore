@@ -1,0 +1,16 @@
+.DS_Store
+
+# Arduino IDE / CLI local files
+build/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Editor settings
+.vscode/
+.idea/
+*.code-workspace
+
+# Local environment files
+sketch.yaml
