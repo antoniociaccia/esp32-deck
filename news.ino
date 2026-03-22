@@ -41,18 +41,10 @@ void setup() {
 }
 
 void loop() {
-  /*
-    Aggiorniamo orologio e data in alto a sinistra.
-    Il tempo continua ad avanzare localmente dopo la sincronizzazione NTP.
-  */
-  drawDateTime();
-
-  /*
-    Aggiorniamo solo l'indicatore batteria.
-    Non ridisegniamo tutto il display ogni volta,
-    così evitiamo sfarfallii inutili.
-  */
-  drawBatteryStatus();
+  updateHeaderArea();
+  updateBatteryArea();
+  updateCenterArea();
+  updateNewsTicker();
   printDebugStatus();
-  delay(1000);
+  delay(20);
 }
