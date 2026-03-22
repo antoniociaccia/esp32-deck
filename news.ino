@@ -44,7 +44,7 @@ void loop() {
   updateHeaderArea();
   updateBatteryArea();
   updateCenterArea();
-  updateNewsTicker();
+  updateNewsFooter();
   printDebugStatus();
   delay(20);
 }
