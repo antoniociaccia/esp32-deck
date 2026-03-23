@@ -2,8 +2,10 @@
 #include "TFT_eSPI.h"
 #include "FT6336U.h"
 
-static const uint16_t screenWidth = 240;
-static const uint16_t screenHeight = 320;
+static const uint16_t rawTouchWidth = 240;
+static const uint16_t rawTouchHeight = 320;
+static const uint16_t screenWidth = 320;
+static const uint16_t screenHeight = 240;
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * 10];
@@ -46,8 +48,34 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
     return;
   }
 
-  int x = tp.tp[0].x;
-  int y = tp.tp[0].y;
+  int rawX = tp.tp[0].x;
+  int rawY = tp.tp[0].y;
+  int x = rawX;
+  int y = rawY;
+
+  // Freenove references:
+  // - Sketch_13.1_LVGL uses raw portrait coordinates with TFT_DIRECTION 0
+  // - Sketch_12.1_TFT_Touch_Draw_2.8_Inch uses this transform for setRotation(1):
+  //   x = tp.tp[0].y;
+  //   y = 240 - tp.tp[0].x;
+  if (TFT_DIRECTION == 1) {
+    x = rawY;
+    y = screenHeight - rawX;
+  } else if (TFT_DIRECTION == 2) {
+    x = rawTouchWidth - rawX;
+    y = rawTouchHeight - rawY;
+  } else if (TFT_DIRECTION == 3) {
+    x = rawTouchHeight - rawY;
+    y = rawX;
+  }
+
+  if (x >= screenWidth) {
+    x = screenWidth - 1;
+  }
+  if (y >= screenHeight) {
+    y = screenHeight - 1;
+  }
+
   if (x >= 0 && x < screenWidth && y >= 0 && y < screenHeight) {
     touchPressed = true;
     lastTouchX = x;

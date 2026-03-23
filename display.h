@@ -16,7 +16,7 @@
 #define RST_N_PIN 18
 #endif
 
-#define TFT_DIRECTION 0
+#define TFT_DIRECTION 1
 
 class Display {
 public:
