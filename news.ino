@@ -7,8 +7,10 @@ Display screen;
 
 static lv_obj_t *timeLabel = nullptr;
 static lv_obj_t *weatherLabel = nullptr;
-static lv_obj_t *batteryLabel = nullptr;
 static lv_obj_t *wifiLabel = nullptr;
+static lv_obj_t *batteryPercentLabel = nullptr;
+static lv_obj_t *batteryVoltageLabel = nullptr;
+static lv_obj_t *batteryIconLabel = nullptr;
 static lv_obj_t *moduleDotsWrap = nullptr;
 static lv_obj_t *newsLabel = nullptr;
 static lv_obj_t *tileview = nullptr;
@@ -18,9 +20,12 @@ static lv_obj_t *moduleDots[4] = {nullptr};
 static unsigned long lastClockUpdateMs = 0;
 static unsigned long lastNewsRotateMs = 0;
 static unsigned long lastTimeSyncAttemptMs = 0;
+static unsigned long lastBatteryUpdateMs = 0;
 static int currentNewsIndex = 0;
 static int currentModuleIndex = 0;
 static bool timeSynced = false;
+static float filteredBatteryVoltage = 0.0f;
+static bool batteryInitialized = false;
 
 static const lv_coord_t HEADER_W = 314;
 static const lv_coord_t HEADER_H = 30;
@@ -29,6 +34,16 @@ static const lv_coord_t MAIN_H = 136;
 static const lv_coord_t FOOTER_W = 314;
 static const lv_coord_t FOOTER_H = 40;
 static const lv_coord_t PANEL_RADIUS = 4;
+
+static const int BAT_PIN = 9;
+static constexpr float BATTERY_DIVIDER_RATIO = 2.0f;
+static constexpr float BATTERY_CALIBRATION_FACTOR = 1.00f;
+static constexpr int BATTERY_SAMPLE_COUNT = 12;
+static constexpr float BATTERY_FILTER_ALPHA = 0.15f;
+static constexpr float BATTERY_MAX_STEP_VOLTS = 0.20f;
+static constexpr float BATTERY_EMPTY_VOLTS = 3.30f;
+static constexpr float BATTERY_FULL_VOLTS = 4.20f;
+static constexpr unsigned long BATTERY_REFRESH_INTERVAL_MS = 2000;
 
 static const char *NEWS_ITEMS[] = {
   "IT | Dashboard pronta per dati reali",
@@ -108,6 +123,120 @@ void updateModuleDots() {
 
 void updateModuleUi() {
   updateModuleDots();
+}
+
+float clampBatteryVoltage(float value) {
+  if (value < BATTERY_EMPTY_VOLTS) {
+    return BATTERY_EMPTY_VOLTS;
+  }
+  if (value > BATTERY_FULL_VOLTS) {
+    return BATTERY_FULL_VOLTS;
+  }
+  return value;
+}
+
+float interpolateSegment(float voltage, float v1, float p1, float v2, float p2) {
+  if (v2 <= v1) {
+    return p1;
+  }
+
+  float ratio = (voltage - v1) / (v2 - v1);
+  return p1 + (ratio * (p2 - p1));
+}
+
+int batteryPercentFromVoltage(float voltage) {
+  float clamped = clampBatteryVoltage(voltage);
+
+  // Piecewise LiPo approximation for a 1-cell battery under light load.
+  float percentFloat = 0.0f;
+  if (clamped >= 4.15f) {
+    percentFloat = interpolateSegment(clamped, 4.15f, 95.0f, 4.20f, 100.0f);
+  } else if (clamped >= 4.08f) {
+    percentFloat = interpolateSegment(clamped, 4.08f, 85.0f, 4.15f, 95.0f);
+  } else if (clamped >= 4.00f) {
+    percentFloat = interpolateSegment(clamped, 4.00f, 72.0f, 4.08f, 85.0f);
+  } else if (clamped >= 3.92f) {
+    percentFloat = interpolateSegment(clamped, 3.92f, 58.0f, 4.00f, 72.0f);
+  } else if (clamped >= 3.85f) {
+    percentFloat = interpolateSegment(clamped, 3.85f, 42.0f, 3.92f, 58.0f);
+  } else if (clamped >= 3.78f) {
+    percentFloat = interpolateSegment(clamped, 3.78f, 27.0f, 3.85f, 42.0f);
+  } else if (clamped >= 3.68f) {
+    percentFloat = interpolateSegment(clamped, 3.68f, 14.0f, 3.78f, 27.0f);
+  } else if (clamped >= 3.55f) {
+    percentFloat = interpolateSegment(clamped, 3.55f, 6.0f, 3.68f, 14.0f);
+  } else {
+    percentFloat = interpolateSegment(clamped, 3.30f, 0.0f, 3.55f, 6.0f);
+  }
+
+  int percent = (int)lroundf(percentFloat);
+  if (percent < 0) {
+    return 0;
+  }
+  if (percent > 100) {
+    return 100;
+  }
+  return percent;
+}
+
+float readBatteryVoltage() {
+  uint32_t totalMilliVolts = 0;
+  for (int i = 0; i < BATTERY_SAMPLE_COUNT; ++i) {
+    totalMilliVolts += analogReadMilliVolts(BAT_PIN);
+    delay(2);
+  }
+
+  float averageMilliVolts = totalMilliVolts / (float)BATTERY_SAMPLE_COUNT;
+  return (averageMilliVolts / 1000.0f) * BATTERY_DIVIDER_RATIO * BATTERY_CALIBRATION_FACTOR;
+}
+
+void initBatteryMonitoring() {
+  analogSetPinAttenuation(BAT_PIN, ADC_11db);
+}
+
+void updateBatteryUi() {
+  if (millis() - lastBatteryUpdateMs < BATTERY_REFRESH_INTERVAL_MS) {
+    return;
+  }
+
+  lastBatteryUpdateMs = millis();
+
+  float measuredVoltage = readBatteryVoltage();
+  if (!batteryInitialized) {
+    filteredBatteryVoltage = measuredVoltage;
+    batteryInitialized = true;
+  } else {
+    float delta = measuredVoltage - filteredBatteryVoltage;
+    if (delta > BATTERY_MAX_STEP_VOLTS) {
+      measuredVoltage = filteredBatteryVoltage + BATTERY_MAX_STEP_VOLTS;
+    } else if (delta < -BATTERY_MAX_STEP_VOLTS) {
+      measuredVoltage = filteredBatteryVoltage - BATTERY_MAX_STEP_VOLTS;
+    }
+
+    filteredBatteryVoltage = (BATTERY_FILTER_ALPHA * measuredVoltage) +
+      ((1.0f - BATTERY_FILTER_ALPHA) * filteredBatteryVoltage);
+  }
+
+  int batteryPercent = batteryPercentFromVoltage(filteredBatteryVoltage);
+  char percentBuffer[12];
+  snprintf(percentBuffer, sizeof(percentBuffer), "%d%%", batteryPercent);
+  lv_label_set_text(batteryPercentLabel, percentBuffer);
+
+  char voltageBuffer[12];
+  snprintf(voltageBuffer, sizeof(voltageBuffer), "%.2fV", filteredBatteryVoltage);
+  lv_label_set_text(batteryVoltageLabel, voltageBuffer);
+
+  if (batteryPercent >= 85) {
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_FULL);
+  } else if (batteryPercent >= 60) {
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_3);
+  } else if (batteryPercent >= 35) {
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_2);
+  } else if (batteryPercent >= 15) {
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_1);
+  } else {
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_EMPTY);
+  }
 }
 
 void updateClockUi() {
@@ -192,6 +321,8 @@ void createHeader(lv_obj_t *parent) {
   lv_obj_set_size(header, HEADER_W, HEADER_H);
   lv_obj_set_style_pad_hor(header, 8, 0);
   lv_obj_set_style_pad_ver(header, 3, 0);
+  lv_obj_set_scrollbar_mode(header, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
   stylePanel(header, lv_color_hex(0x18344A), lv_color_hex(0x28485E));
 
   timeLabel = lv_label_create(header);
@@ -206,17 +337,50 @@ void createHeader(lv_obj_t *parent) {
   setLabelColor(weatherLabel, lv_color_hex(0xCFE8FF));
   lv_obj_align(weatherLabel, LV_ALIGN_CENTER, 0, 0);
 
-  wifiLabel = lv_label_create(header);
-  lv_label_set_text(wifiLabel, LV_SYMBOL_WIFI);
-  setLabelFont(wifiLabel, &lv_font_montserrat_14);
-  setLabelColor(wifiLabel, lv_color_hex(0x94A3B8));
-  lv_obj_align(wifiLabel, LV_ALIGN_RIGHT_MID, -52, 0);
+  lv_obj_t *rightWrap = lv_obj_create(header);
+  lv_obj_set_size(rightWrap, 96, 24);
+  lv_obj_align(rightWrap, LV_ALIGN_RIGHT_MID, 0, 0);
+  lv_obj_set_flex_flow(rightWrap, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(rightWrap, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(rightWrap, 0, 0);
+  lv_obj_set_style_pad_gap(rightWrap, 4, 0);
+  lv_obj_set_style_bg_opa(rightWrap, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(rightWrap, 0, 0);
+  lv_obj_clear_flag(rightWrap, LV_OBJ_FLAG_SCROLLABLE);
 
-  batteryLabel = lv_label_create(header);
-  lv_label_set_text(batteryLabel, "BAT 100%");
-  setLabelFont(batteryLabel, &lv_font_montserrat_14);
-  setLabelColor(batteryLabel, lv_color_hex(0xC7F9CC));
-  lv_obj_align(batteryLabel, LV_ALIGN_RIGHT_MID, 0, 0);
+  wifiLabel = lv_label_create(rightWrap);
+  lv_label_set_text(wifiLabel, LV_SYMBOL_WIFI);
+  setLabelFont(wifiLabel, &lv_font_montserrat_12);
+  setLabelColor(wifiLabel, lv_color_hex(0x94A3B8));
+
+  lv_obj_t *batteryTextWrap = lv_obj_create(rightWrap);
+  lv_obj_set_size(batteryTextWrap, 34, 20);
+  lv_obj_set_flex_flow(batteryTextWrap, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(batteryTextWrap, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(batteryTextWrap, 0, 0);
+  lv_obj_set_style_pad_row(batteryTextWrap, 0, 0);
+  lv_obj_set_style_bg_opa(batteryTextWrap, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(batteryTextWrap, 0, 0);
+  lv_obj_clear_flag(batteryTextWrap, LV_OBJ_FLAG_SCROLLABLE);
+
+  batteryPercentLabel = lv_label_create(batteryTextWrap);
+  lv_label_set_text(batteryPercentLabel, "--%");
+  setLabelFont(batteryPercentLabel, &lv_font_montserrat_10);
+  setLabelColor(batteryPercentLabel, lv_color_hex(0xC7F9CC));
+  lv_obj_set_width(batteryPercentLabel, 34);
+  lv_obj_set_style_text_align(batteryPercentLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+
+  batteryVoltageLabel = lv_label_create(batteryTextWrap);
+  lv_label_set_text(batteryVoltageLabel, "--.--V");
+  setLabelFont(batteryVoltageLabel, &lv_font_montserrat_10);
+  setLabelColor(batteryVoltageLabel, lv_color_hex(0xC7F9CC));
+  lv_obj_set_width(batteryVoltageLabel, 34);
+  lv_obj_set_style_text_align(batteryVoltageLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
+
+  batteryIconLabel = lv_label_create(rightWrap);
+  lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_3);
+  setLabelFont(batteryIconLabel, &lv_font_montserrat_12);
+  setLabelColor(batteryIconLabel, lv_color_hex(0xC7F9CC));
 }
 
 void tileviewEventCb(lv_event_t *e) {
@@ -349,6 +513,7 @@ void setup() {
 
   screen.init();
   createDashboardUi();
+  initBatteryMonitoring();
   beginTimeSync();
 
   Serial.println("Desk dashboard LVGL");
@@ -359,6 +524,7 @@ void loop() {
   screen.routine();
   maintainTimeSync();
   updateClockUi();
+  updateBatteryUi();
   updateNewsUi();
   delay(5);
 }
