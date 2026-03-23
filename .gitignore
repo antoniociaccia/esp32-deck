@@ -14,6 +14,7 @@ build/
 
 # Local environment files
 sketch.yaml
+secrets.h
 
 # Doc
 

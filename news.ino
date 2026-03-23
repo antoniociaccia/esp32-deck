@@ -1,4 +1,7 @@
 #include "display.h"
+#include <WiFi.h>
+#include <time.h>
+#include "secrets.h"
 
 Display screen;
 
@@ -13,8 +16,10 @@ static lv_obj_t *moduleDots[4] = {nullptr};
 
 static unsigned long lastClockUpdateMs = 0;
 static unsigned long lastNewsRotateMs = 0;
+static unsigned long lastTimeSyncAttemptMs = 0;
 static int currentNewsIndex = 0;
 static int currentModuleIndex = 0;
+static bool timeSynced = false;
 
 static const lv_coord_t HEADER_W = 314;
 static const lv_coord_t HEADER_H = 30;
@@ -98,13 +103,16 @@ void updateClockUi() {
 
   lastClockUpdateMs = millis();
 
-  unsigned long seconds = millis() / 1000;
-  int hours = (seconds / 3600) % 24;
-  int minutes = (seconds / 60) % 60;
-
-  char buffer[16];
-  snprintf(buffer, sizeof(buffer), "%02d:%02d", hours, minutes);
-  lv_label_set_text(timeLabel, buffer);
+  char timeBuffer[24];
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo, 10)) {
+    snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d %02d:%02d",
+      timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_hour, timeinfo.tm_min);
+    timeSynced = true;
+  } else {
+    snprintf(timeBuffer, sizeof(timeBuffer), "sync orario...");
+  }
+  lv_label_set_text(timeLabel, timeBuffer);
 }
 
 void updateNewsUi() {
@@ -117,6 +125,50 @@ void updateNewsUi() {
   lv_label_set_text(newsLabel, NEWS_ITEMS[currentNewsIndex]);
 }
 
+void beginTimeSync() {
+  if (strlen(WIFI_SSID) == 0) {
+    Serial.println("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
+    lv_label_set_text(timeLabel, "config WiFi");
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.println("Connessione WiFi per NTP...");
+  }
+
+  configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
+  lastTimeSyncAttemptMs = millis();
+}
+
+void maintainTimeSync() {
+  if (timeSynced) {
+    return;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    if (millis() - lastTimeSyncAttemptMs > 10000) {
+      beginTimeSync();
+    }
+    return;
+  }
+
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo, 10)) {
+    timeSynced = true;
+    Serial.println("Orario NTP sincronizzato");
+    updateClockUi();
+    return;
+  }
+
+  if (millis() - lastTimeSyncAttemptMs > 15000) {
+    Serial.println("Ritento sync NTP");
+    configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
+    lastTimeSyncAttemptMs = millis();
+  }
+}
+
 void createHeader(lv_obj_t *parent) {
   lv_obj_t *header = lv_obj_create(parent);
   lv_obj_set_size(header, HEADER_W, HEADER_H);
@@ -125,8 +177,8 @@ void createHeader(lv_obj_t *parent) {
   stylePanel(header, lv_color_hex(0x18344A), lv_color_hex(0x28485E));
 
   timeLabel = lv_label_create(header);
-  lv_label_set_text(timeLabel, "00:00");
-  setLabelFont(timeLabel, &lv_font_montserrat_20);
+  lv_label_set_text(timeLabel, "sync orario...");
+  setLabelFont(timeLabel, &lv_font_montserrat_14);
   setLabelColor(timeLabel, lv_color_hex(0xF8FAFC));
   lv_obj_align(timeLabel, LV_ALIGN_LEFT_MID, 0, 0);
 
@@ -273,6 +325,7 @@ void setup() {
 
   screen.init();
   createDashboardUi();
+  beginTimeSync();
 
   Serial.println("Desk dashboard LVGL");
   Serial.println("Setup done");
@@ -280,6 +333,7 @@ void setup() {
 
 void loop() {
   screen.routine();
+  maintainTimeSync();
   updateClockUi();
   updateNewsUi();
   delay(5);
