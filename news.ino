@@ -22,16 +22,16 @@ static lv_obj_t *moduleTiles[4] = {nullptr};
 static lv_obj_t *moduleDots[4] = {nullptr};
 
 static unsigned long lastClockUpdateMs = 0;
-static unsigned long lastNewsRotateMs = 0;
 static unsigned long lastTimeSyncAttemptMs = 0;
 static unsigned long lastBatteryUpdateMs = 0;
 static unsigned long lastWeatherUpdateMs = 0;
-static int currentNewsIndex = 0;
+static unsigned long lastNewsFetchMs = 0;
 static int currentModuleIndex = 0;
 static bool timeSynced = false;
 static float filteredBatteryVoltage = 0.0f;
 static bool batteryInitialized = false;
 static bool weatherValid = false;
+static bool newsValid = false;
 
 static const lv_coord_t HEADER_W = 314;
 static const lv_coord_t HEADER_H = 30;
@@ -52,14 +52,22 @@ static constexpr float BATTERY_FULL_VOLTS = 4.20f;
 static constexpr unsigned long BATTERY_REFRESH_INTERVAL_MS = 2000;
 static constexpr unsigned long WEATHER_REFRESH_INTERVAL_MS = 1800000;
 static constexpr unsigned long WEATHER_RETRY_INTERVAL_MS = 30000;
+static constexpr unsigned long NEWS_REFRESH_INTERVAL_MS = 900000;
+static constexpr unsigned long NEWS_RETRY_INTERVAL_MS = 60000;
 
-static const char *NEWS_ITEMS[] = {
+static const char *DEFAULT_NEWS_ITEMS[] = {
   "IT | Dashboard pronta per dati reali",
   "TECH | Swipe orizzontale tra i widget",
   "WORLD | Prossimo step: news, meteo e batteria"
 };
 
-static const int NEWS_ITEM_COUNT = sizeof(NEWS_ITEMS) / sizeof(NEWS_ITEMS[0]);
+static const int DEFAULT_NEWS_ITEM_COUNT = sizeof(DEFAULT_NEWS_ITEMS) / sizeof(DEFAULT_NEWS_ITEMS[0]);
+static const int MAX_NEWS_ITEMS = 12;
+static const int MAX_NEWS_TEXT_LEN = 256;
+static const int MAX_TICKER_LEN = 3600;
+static char newsItems[MAX_NEWS_ITEMS][MAX_NEWS_TEXT_LEN];
+static char newsTicker[MAX_TICKER_LEN];
+static int newsItemCount = 0;
 
 struct ModuleContent {
   const char *title;
@@ -126,6 +134,119 @@ String extractJsonStringAfterKey(const String &payload, const char *key, const c
   }
 
   return payload.substring(startQuote + 1, endQuote);
+}
+
+String decodeJsonString(const String &value) {
+  String decoded;
+  decoded.reserve(value.length());
+
+  for (int i = 0; i < value.length(); ++i) {
+    char c = value[i];
+    if (c == '\\' && i + 1 < value.length()) {
+      char next = value[++i];
+      switch (next) {
+        case '\"': decoded += '\"'; break;
+        case '\\': decoded += '\\'; break;
+        case '/': decoded += '/'; break;
+        case 'b': decoded += ' '; break;
+        case 'f': decoded += ' '; break;
+        case 'n': decoded += ' '; break;
+        case 'r': decoded += ' '; break;
+        case 't': decoded += ' '; break;
+        default: decoded += next; break;
+      }
+    } else {
+      decoded += c;
+    }
+  }
+
+  decoded.trim();
+  return decoded;
+}
+
+void normalizeNewsText(String &text) {
+  text.replace("\n", " ");
+  text.replace("\r", " ");
+  while (text.indexOf("  ") >= 0) {
+    text.replace("  ", " ");
+  }
+  text.trim();
+}
+
+void rebuildNewsTicker() {
+  newsTicker[0] = '\0';
+  for (int i = 0; i < newsItemCount; ++i) {
+    if (i > 0) {
+      strlcat(newsTicker, "     •     ", MAX_TICKER_LEN);
+    }
+    strlcat(newsTicker, newsItems[i], MAX_TICKER_LEN);
+  }
+
+  if (newsLabel != nullptr) {
+    lv_label_set_text(newsLabel, newsTicker);
+  }
+}
+
+void setDefaultNewsItems() {
+  newsItemCount = DEFAULT_NEWS_ITEM_COUNT;
+  for (int i = 0; i < DEFAULT_NEWS_ITEM_COUNT; ++i) {
+    strlcpy(newsItems[i], DEFAULT_NEWS_ITEMS[i], MAX_NEWS_TEXT_LEN);
+  }
+  rebuildNewsTicker();
+}
+
+bool parseNewsItems(const String &payload) {
+  int parsedCount = 0;
+  int searchFrom = 0;
+
+  while (parsedCount < MAX_NEWS_ITEMS) {
+    int textKey = payload.indexOf("\"text\"", searchFrom);
+    if (textKey < 0) {
+      break;
+    }
+
+    int colonIndex = payload.indexOf(':', textKey);
+    int startQuote = payload.indexOf('\"', colonIndex + 1);
+    if (colonIndex < 0 || startQuote < 0) {
+      break;
+    }
+
+    bool escaped = false;
+    int endQuote = -1;
+    for (int i = startQuote + 1; i < payload.length(); ++i) {
+      char c = payload[i];
+      if (c == '\\' && !escaped) {
+        escaped = true;
+        continue;
+      }
+      if (c == '\"' && !escaped) {
+        endQuote = i;
+        break;
+      }
+      escaped = false;
+    }
+
+    if (endQuote < 0) {
+      break;
+    }
+
+    String decoded = decodeJsonString(payload.substring(startQuote + 1, endQuote));
+    normalizeNewsText(decoded);
+    if (decoded.length() > 0) {
+      strlcpy(newsItems[parsedCount], decoded.c_str(), MAX_NEWS_TEXT_LEN);
+      parsedCount++;
+    }
+
+    searchFrom = endQuote + 1;
+  }
+
+  if (parsedCount <= 0) {
+    return false;
+  }
+
+  newsItemCount = parsedCount;
+  rebuildNewsTicker();
+  return true;
 }
 
 void setLabelFont(lv_obj_t *label, const lv_font_t *font) {
@@ -318,14 +439,45 @@ void updateClockUi() {
   lv_label_set_text(timeLabel, timeBuffer);
 }
 
-void updateNewsUi() {
-  if (millis() - lastNewsRotateMs < 5000) {
+void updateNewsFeed() {
+  unsigned long refreshInterval = newsValid ? NEWS_REFRESH_INTERVAL_MS : NEWS_RETRY_INTERVAL_MS;
+  if (millis() - lastNewsFetchMs < refreshInterval) {
     return;
   }
 
-  lastNewsRotateMs = millis();
-  currentNewsIndex = (currentNewsIndex + 1) % NEWS_ITEM_COUNT;
-  lv_label_set_text(newsLabel, NEWS_ITEMS[currentNewsIndex]);
+  lastNewsFetchMs = millis();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    newsValid = false;
+    return;
+  }
+
+  if (strlen(NEWS_API_URL) == 0 || strlen(NEWS_API_KEY) == 0) {
+    newsValid = false;
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  if (!http.begin(client, NEWS_API_URL)) {
+    newsValid = false;
+    return;
+  }
+
+  http.addHeader("X-API-Key", NEWS_API_KEY);
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    newsValid = false;
+    http.end();
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  newsValid = parseNewsItems(payload);
 }
 
 void updateWeatherIconUi(const String &iconCode) {
@@ -636,8 +788,8 @@ void createFooter(lv_obj_t *parent) {
   lv_label_set_long_mode(newsLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
   lv_obj_set_scrollbar_mode(newsLabel, LV_SCROLLBAR_MODE_OFF);
   lv_obj_clear_flag(newsLabel, LV_OBJ_FLAG_SCROLLABLE);
-  lv_label_set_text(newsLabel, NEWS_ITEMS[currentNewsIndex]);
-  setLabelFont(newsLabel, &lv_font_montserrat_14);
+  lv_label_set_text(newsLabel, newsTicker);
+  setLabelFont(newsLabel, &lv_font_montserrat_16);
   setLabelColor(newsLabel, lv_color_hex(0xE2E8F0));
   lv_obj_align(newsLabel, LV_ALIGN_LEFT_MID, 0, 0);
 }
@@ -665,6 +817,7 @@ void setup() {
   Serial.begin(115200);
 
   screen.init();
+  setDefaultNewsItems();
   createDashboardUi();
   initBatteryMonitoring();
   beginTimeSync();
@@ -679,6 +832,6 @@ void loop() {
   updateClockUi();
   updateBatteryUi();
   updateWeatherUi();
-  updateNewsUi();
+  updateNewsFeed();
   delay(5);
 }
