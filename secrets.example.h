@@ -8,4 +8,9 @@ static const char *NTP_SERVER_1 = "pool.ntp.org";
 static const char *NTP_SERVER_2 = "time.nist.gov";
 static const char *TZ_INFO = "CET-1CEST,M3.5.0/2,M10.5.0/3";
 
+static const char *OPENWEATHER_API_KEY = "YOUR_OPENWEATHER_KEY";
+static const char *WEATHER_CITY_LABEL = "YourCity";
+static constexpr float WEATHER_LATITUDE = 0.0f;
+static constexpr float WEATHER_LONGITUDE = 0.0f;
+
 #endif

@@ -1,11 +1,15 @@
 #include "display.h"
+#include <HTTPClient.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <time.h>
 #include "secrets.h"
+#include "weather_icons.h"
 
 Display screen;
 
 static lv_obj_t *timeLabel = nullptr;
+static lv_obj_t *weatherIcon = nullptr;
 static lv_obj_t *weatherLabel = nullptr;
 static lv_obj_t *wifiLabel = nullptr;
 static lv_obj_t *batteryPercentLabel = nullptr;
@@ -21,11 +25,13 @@ static unsigned long lastClockUpdateMs = 0;
 static unsigned long lastNewsRotateMs = 0;
 static unsigned long lastTimeSyncAttemptMs = 0;
 static unsigned long lastBatteryUpdateMs = 0;
+static unsigned long lastWeatherUpdateMs = 0;
 static int currentNewsIndex = 0;
 static int currentModuleIndex = 0;
 static bool timeSynced = false;
 static float filteredBatteryVoltage = 0.0f;
 static bool batteryInitialized = false;
+static bool weatherValid = false;
 
 static const lv_coord_t HEADER_W = 314;
 static const lv_coord_t HEADER_H = 30;
@@ -44,6 +50,8 @@ static constexpr float BATTERY_MAX_STEP_VOLTS = 0.20f;
 static constexpr float BATTERY_EMPTY_VOLTS = 3.30f;
 static constexpr float BATTERY_FULL_VOLTS = 4.20f;
 static constexpr unsigned long BATTERY_REFRESH_INTERVAL_MS = 2000;
+static constexpr unsigned long WEATHER_REFRESH_INTERVAL_MS = 1800000;
+static constexpr unsigned long WEATHER_RETRY_INTERVAL_MS = 30000;
 
 static const char *NEWS_ITEMS[] = {
   "IT | Dashboard pronta per dati reali",
@@ -67,6 +75,58 @@ static const ModuleContent MODULES[] = {
 };
 
 static const int MODULE_COUNT = sizeof(MODULES) / sizeof(MODULES[0]);
+
+int extractJsonIntAfterKey(const String &payload, const char *key, int fallbackValue) {
+  int keyIndex = payload.indexOf(key);
+  if (keyIndex < 0) {
+    return fallbackValue;
+  }
+
+  int colonIndex = payload.indexOf(':', keyIndex);
+  if (colonIndex < 0) {
+    return fallbackValue;
+  }
+
+  int start = colonIndex + 1;
+  while (start < payload.length() && (payload[start] == ' ' || payload[start] == '\"')) {
+    start++;
+  }
+
+  int end = start;
+  while (end < payload.length() && (isDigit(payload[end]) || payload[end] == '-')) {
+    end++;
+  }
+
+  if (end <= start) {
+    return fallbackValue;
+  }
+
+  return payload.substring(start, end).toInt();
+}
+
+String extractJsonStringAfterKey(const String &payload, const char *key, const char *fallbackValue) {
+  int keyIndex = payload.indexOf(key);
+  if (keyIndex < 0) {
+    return String(fallbackValue);
+  }
+
+  int colonIndex = payload.indexOf(':', keyIndex);
+  if (colonIndex < 0) {
+    return String(fallbackValue);
+  }
+
+  int startQuote = payload.indexOf('\"', colonIndex + 1);
+  if (startQuote < 0) {
+    return String(fallbackValue);
+  }
+
+  int endQuote = payload.indexOf('\"', startQuote + 1);
+  if (endQuote < 0 || endQuote <= startQuote) {
+    return String(fallbackValue);
+  }
+
+  return payload.substring(startQuote + 1, endQuote);
+}
 
 void setLabelFont(lv_obj_t *label, const lv_font_t *font) {
   lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
@@ -268,6 +328,85 @@ void updateNewsUi() {
   lv_label_set_text(newsLabel, NEWS_ITEMS[currentNewsIndex]);
 }
 
+void updateWeatherIconUi(const String &iconCode) {
+  if (weatherIcon == nullptr) {
+    return;
+  }
+
+  if (iconCode.startsWith("01")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_SUN);
+  } else if (iconCode.startsWith("02") || iconCode.startsWith("03") || iconCode.startsWith("04")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_CLOUD);
+  } else if (iconCode.startsWith("09") || iconCode.startsWith("10")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_RAIN);
+  } else if (iconCode.startsWith("11")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_STORM);
+  } else if (iconCode.startsWith("13")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_SNOW);
+  } else if (iconCode.startsWith("50")) {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_FOG);
+  } else {
+    lv_img_set_src(weatherIcon, &IMG_WEATHER_CLOUD);
+  }
+}
+
+void updateWeatherUi() {
+  unsigned long refreshInterval = weatherValid ? WEATHER_REFRESH_INTERVAL_MS : WEATHER_RETRY_INTERVAL_MS;
+  if (millis() - lastWeatherUpdateMs < refreshInterval) {
+    return;
+  }
+
+  lastWeatherUpdateMs = millis();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    weatherValid = false;
+    lv_label_set_text(weatherLabel, "meteo offline");
+    return;
+  }
+
+  if (strlen(OPENWEATHER_API_KEY) == 0) {
+    weatherValid = false;
+    lv_label_set_text(weatherLabel, "meteo n/d");
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  String url = "https://api.openweathermap.org/data/2.5/weather?lat=";
+  url += String(WEATHER_LATITUDE, 4);
+  url += "&lon=";
+  url += String(WEATHER_LONGITUDE, 4);
+  url += "&units=metric&lang=it&appid=";
+  url += OPENWEATHER_API_KEY;
+
+  if (!http.begin(client, url)) {
+    weatherValid = false;
+    lv_label_set_text(weatherLabel, "meteo errore");
+    return;
+  }
+
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    weatherValid = false;
+    lv_label_set_text(weatherLabel, "meteo errore");
+    http.end();
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  int temperature = extractJsonIntAfterKey(payload, "\"temp\"", 0);
+  String iconCode = extractJsonStringAfterKey(payload, "\"icon\"", "");
+  char weatherBuffer[32];
+  snprintf(weatherBuffer, sizeof(weatherBuffer), "%s %dC", WEATHER_CITY_LABEL, temperature);
+  lv_label_set_text(weatherLabel, weatherBuffer);
+  updateWeatherIconUi(iconCode);
+  weatherValid = true;
+}
+
 void beginTimeSync() {
   if (strlen(WIFI_SSID) == 0) {
     Serial.println("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
@@ -331,11 +470,25 @@ void createHeader(lv_obj_t *parent) {
   setLabelColor(timeLabel, lv_color_hex(0xF8FAFC));
   lv_obj_align(timeLabel, LV_ALIGN_LEFT_MID, 0, 0);
 
-  weatherLabel = lv_label_create(header);
+  lv_obj_t *weatherWrap = lv_obj_create(header);
+  lv_obj_set_size(weatherWrap, 94, 18);
+  lv_obj_align(weatherWrap, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_flex_flow(weatherWrap, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(weatherWrap, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(weatherWrap, 0, 0);
+  lv_obj_set_style_pad_gap(weatherWrap, 4, 0);
+  lv_obj_set_style_bg_opa(weatherWrap, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(weatherWrap, 0, 0);
+  lv_obj_clear_flag(weatherWrap, LV_OBJ_FLAG_SCROLLABLE);
+
+  weatherIcon = lv_img_create(weatherWrap);
+  lv_img_set_src(weatherIcon, &IMG_WEATHER_SUN);
+  lv_obj_clear_flag(weatherIcon, LV_OBJ_FLAG_SCROLLABLE);
+
+  weatherLabel = lv_label_create(weatherWrap);
   lv_label_set_text(weatherLabel, "Roma 18C");
   setLabelFont(weatherLabel, &lv_font_montserrat_14);
   setLabelColor(weatherLabel, lv_color_hex(0xCFE8FF));
-  lv_obj_align(weatherLabel, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_t *rightWrap = lv_obj_create(header);
   lv_obj_set_size(rightWrap, 96, 24);
@@ -525,6 +678,7 @@ void loop() {
   maintainTimeSync();
   updateClockUi();
   updateBatteryUi();
+  updateWeatherUi();
   updateNewsUi();
   delay(5);
 }
