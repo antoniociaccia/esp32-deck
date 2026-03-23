@@ -8,6 +8,7 @@ Display screen;
 static lv_obj_t *timeLabel = nullptr;
 static lv_obj_t *weatherLabel = nullptr;
 static lv_obj_t *batteryLabel = nullptr;
+static lv_obj_t *wifiLabel = nullptr;
 static lv_obj_t *moduleDotsWrap = nullptr;
 static lv_obj_t *newsLabel = nullptr;
 static lv_obj_t *tileview = nullptr;
@@ -58,6 +59,19 @@ void setLabelFont(lv_obj_t *label, const lv_font_t *font) {
 
 void setLabelColor(lv_obj_t *label, lv_color_t color) {
   lv_obj_set_style_text_color(label, color, LV_PART_MAIN);
+}
+
+void updateWifiUi() {
+  if (wifiLabel == nullptr) {
+    return;
+  }
+
+  lv_label_set_text(wifiLabel, LV_SYMBOL_WIFI);
+  if (WiFi.status() == WL_CONNECTED) {
+    setLabelColor(wifiLabel, lv_color_hex(0x86EFAC));
+  } else {
+    setLabelColor(wifiLabel, lv_color_hex(0x94A3B8));
+  }
 }
 
 void stylePanel(lv_obj_t *panel, lv_color_t bgColor, lv_color_t borderColor) {
@@ -129,6 +143,7 @@ void beginTimeSync() {
   if (strlen(WIFI_SSID) == 0) {
     Serial.println("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
     lv_label_set_text(timeLabel, "config WiFi");
+    updateWifiUi();
     return;
   }
 
@@ -140,9 +155,12 @@ void beginTimeSync() {
 
   configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
   lastTimeSyncAttemptMs = millis();
+  updateWifiUi();
 }
 
 void maintainTimeSync() {
+  updateWifiUi();
+
   if (timeSynced) {
     return;
   }
@@ -187,6 +205,12 @@ void createHeader(lv_obj_t *parent) {
   setLabelFont(weatherLabel, &lv_font_montserrat_14);
   setLabelColor(weatherLabel, lv_color_hex(0xCFE8FF));
   lv_obj_align(weatherLabel, LV_ALIGN_CENTER, 0, 0);
+
+  wifiLabel = lv_label_create(header);
+  lv_label_set_text(wifiLabel, LV_SYMBOL_WIFI);
+  setLabelFont(wifiLabel, &lv_font_montserrat_14);
+  setLabelColor(wifiLabel, lv_color_hex(0x94A3B8));
+  lv_obj_align(wifiLabel, LV_ALIGN_RIGHT_MID, -52, 0);
 
   batteryLabel = lv_label_create(header);
   lv_label_set_text(batteryLabel, "BAT 100%");
