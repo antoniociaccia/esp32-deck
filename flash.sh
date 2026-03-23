@@ -2,16 +2,37 @@
 
 set -euo pipefail
 
-FQBN="esp32:esp32:d32_pro:PartitionScheme=no_ota"
-PORT="/dev/cu.wchusbserial21440"
+FQBN="esp32:esp32:esp32s3"
+PORT="/dev/cu.usbmodem14401"
 BUILD_PATH="/tmp/arduino-news-build"
 BUILD_LOG="/tmp/arduino-news-build.log"
-FLASH_SIZE="16MB"
-APP_MAX_BYTES="8388608"
+CLEAN_BUILD=0
+
+if [[ "${1:-}" == "--clean" ]]; then
+  CLEAN_BUILD=1
+fi
+
+render_bar() {
+  local used="$1"
+  local total="$2"
+  local label="$3"
+  local width=30
+  local percent filled empty bar
+
+  percent=$(awk "BEGIN { printf \"%d\", ($used * 100) / $total }")
+  filled=$(awk "BEGIN { printf \"%d\", ($used * $width) / $total }")
+  empty=$((width - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '')"
+
+  printf "%-5s [%s] %3d%%\n" "$label" "$bar" "$percent"
+}
 
 echo "Compilo lo sketch..."
-rm -rf "$BUILD_PATH"
-arduino-cli compile --fqbn "$FQBN" --build-property "build.flash_size=$FLASH_SIZE" --build-property "upload.maximum_size=$APP_MAX_BYTES" --build-path "$BUILD_PATH" . | tee "$BUILD_LOG"
+if [[ "$CLEAN_BUILD" -eq 1 ]]; then
+  echo "Pulizia build cache..."
+  rm -rf "$BUILD_PATH"
+fi
+arduino-cli compile --fqbn "$FQBN" --build-path "$BUILD_PATH" . | tee "$BUILD_LOG"
 
 FLASH_LINE=$(grep -E "Sketch uses|Lo sketch usa" "$BUILD_LOG" | head -n 1 || true)
 RAM_LINE=$(grep -E "Global variables use|Le variabili globali usano" "$BUILD_LOG" | head -n 1 || true)
@@ -40,12 +61,14 @@ if [ -n "$RAM_LINE" ]; then
 fi
 if [ -n "$FLASH_LINE" ]; then
   printf "Flash: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $FLASH_BYTES/1000000}")" "$(awk "BEGIN {print $FLASH_MAX_BYTES/1000000}")"
+  render_bar "$FLASH_BYTES" "$FLASH_MAX_BYTES" "Flash"
 fi
 if [ -n "$RAM_LINE" ]; then
   printf "RAM: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $RAM_BYTES/1000000}")" "$(awk "BEGIN {print $RAM_MAX_BYTES/1000000}")"
+  render_bar "$RAM_BYTES" "$RAM_MAX_BYTES" "RAM"
 fi
 
 echo "Carico sulla scheda $PORT..."
-arduino-cli upload -p "$PORT" --fqbn "$FQBN" --upload-property "build.flash_size=$FLASH_SIZE" --build-path "$BUILD_PATH" .
+arduino-cli upload -p "$PORT" --fqbn "$FQBN" --build-path "$BUILD_PATH" .
 
 echo "Upload completato."

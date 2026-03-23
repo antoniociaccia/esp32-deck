@@ -1,55 +1,58 @@
-/*
-  ==========================================
-  ESP32 + ST7789 (170x320) + BATTERIA DISPLAY
-  ==========================================
+#include "display.h"
 
-  Configurazione:
-  - Display SPI ST7789 (1.9", 170x320)
-  - ESP32 LOLIN D32 Pro
-  - Indicatore batteria in alto a destra
+Display screen;
+static lv_obj_t *titleLabel = nullptr;
+static lv_obj_t *statusLabel = nullptr;
+static lv_obj_t *touchLabel = nullptr;
+static unsigned long lastUiUpdateMs = 0;
 
-  Collegamenti display:
-  --------------------------------
-  Display   -> ESP32
-  BLK       -> GPIO32 (retroilluminazione)
-  CS        -> GPIO14 (chip select)
-  DC        -> GPIO27 (data/command)
-  RES       -> GPIO33 (reset)
-  SDA       -> GPIO23 (MOSI - dati)
-  SCL       -> GPIO18 (SCK - clock)
-  VCC       -> 3V3
-  GND       -> GND
+void updateTouchUi() {
+  if (millis() - lastUiUpdateMs < 50) {
+    return;
+  }
 
-  Lettura batteria:
-  --------------------------------
-  BAT_PIN   -> GPIO35
+  lastUiUpdateMs = millis();
 
-  NOTE IMPORTANTI:
-  - SDA/SCL qui NON sono I2C -> sono SPI
-  - ESP32 usa SPI hardware su GPIO18 e GPIO23
-  - La batteria LiPo 3.7V va collegata al connettore JST della board
-  - GPIO35 viene usato per leggere la tensione batteria
-*/
+  if (screen.isTouched()) {
+    lv_label_set_text(statusLabel, "Touch: OK");
+
+    char buffer[48];
+    snprintf(buffer, sizeof(buffer), "x=%d y=%d", screen.touchX(), screen.touchY());
+    lv_label_set_text(touchLabel, buffer);
+  } else {
+    lv_label_set_text(statusLabel, "Touch: attesa");
+    lv_label_set_text(touchLabel, "tocca lo schermo");
+  }
+}
 
 void setup() {
-  initSerialDebug();
-  initBacklight();
-  initBatteryAdc();
-  loadPlaceholderNews();
-  initWifiTime();
-  updateWeatherData();
-  updateNewsData();
-  initDisplay();
-  drawInitialScreen();
+  Serial.begin(115200);
+
+  screen.init();
+
+  String text = "Hello ESP32-S3! ";
+  text += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+
+  Serial.println(text);
+  Serial.println("Freenove LVGL baseline");
+
+  titleLabel = lv_label_create(lv_scr_act());
+  lv_label_set_text(titleLabel, text.c_str());
+  lv_obj_align(titleLabel, LV_ALIGN_TOP_MID, 0, 80);
+
+  statusLabel = lv_label_create(lv_scr_act());
+  lv_label_set_text(statusLabel, "Touch: attesa");
+  lv_obj_align(statusLabel, LV_ALIGN_CENTER, 0, 0);
+
+  touchLabel = lv_label_create(lv_scr_act());
+  lv_label_set_text(touchLabel, "tocca lo schermo");
+  lv_obj_align(touchLabel, LV_ALIGN_BOTTOM_MID, 0, -80);
+
+  Serial.println("Setup done");
 }
 
 void loop() {
-  updateWeatherData();
-  updateNewsData();
-  updateHeaderArea();
-  updateBatteryArea();
-  updateCenterArea();
-  updateNewsFooter();
-  printDebugStatus();
-  delay(20);
+  screen.routine();
+  updateTouchUi();
+  delay(5);
 }

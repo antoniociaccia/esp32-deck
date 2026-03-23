@@ -2,7 +2,7 @@
 
 set -e
 
-PORT="/dev/cu.wchusbserial21440"
+PORT="/dev/cu.usbmodem14401"
 BAUDRATE="115200"
 
 echo "Compilo e carico lo sketch..."

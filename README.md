@@ -1,15 +1,20 @@
 # esp32-news
 
-Arduino/ESP32 project for a LOLIN D32 Pro with ST7789 display, battery indicator, Wi-Fi status, and NTP date/time.
+Arduino/ESP32 project currently aligned to the Freenove ESP32-S3 Display 2.8" with:
+- `TFT_eSPI` official Freenove setup
+- `LVGL` baseline
+- capacitive touch `FT6336U`
 
 ## Notes
 
-- Target board: `esp32:esp32:d32_pro`
+- Target board: `esp32:esp32:esp32s3`
 - Upload helper: `./flash.sh`
 - Upload + serial monitor: `./flash-monitor.sh`
-- Custom flash layout: [`partitions.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions.csv)
+- Partition layout: [`partitions.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions.csv)
 
-The current configuration assumes:
-- `16MB` flash detected on the board
-- `8MB` reserved for the application partition
-- remaining flash reserved for SPIFFS and system partitions
+Current baseline goal:
+- verify TFT
+- verify LVGL
+- verify touch
+
+The old battery/weather/news modules were removed from the active build and can be reintroduced later on top of this stable hardware baseline.
