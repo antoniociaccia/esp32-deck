@@ -9,27 +9,27 @@
 static void buildOtaPopupText(char *buffer, size_t bufferSize) {
   char sizeBuffer[24];
   char progressBuffer[48];
-  if (app.otaRemoteSizeBytes > 0) {
-    snprintf(sizeBuffer, sizeof(sizeBuffer), "%lu KB", static_cast<unsigned long>(app.otaRemoteSizeBytes / 1024UL));
+  if (app.ota.remoteSizeBytes > 0) {
+    snprintf(sizeBuffer, sizeof(sizeBuffer), "%lu KB", static_cast<unsigned long>(app.ota.remoteSizeBytes / 1024UL));
   } else {
     strlcpy(sizeBuffer, "n/d", sizeof(sizeBuffer));
   }
 
-  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
-    if (app.otaApplyBytesTotal > 0) {
+  if (app.ota.applyState == OTA_APPLY_IN_PROGRESS) {
+    if (app.ota.applyBytesTotal > 0) {
       snprintf(
         progressBuffer,
         sizeof(progressBuffer),
         "%d%% (%lu/%lu KB)",
-        app.otaApplyProgressPercent >= 0 ? app.otaApplyProgressPercent : 0,
-        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL),
-        static_cast<unsigned long>(app.otaApplyBytesTotal / 1024UL));
-    } else if (app.otaApplyBytesCurrent > 0) {
+        app.ota.applyProgressPercent >= 0 ? app.ota.applyProgressPercent : 0,
+        static_cast<unsigned long>(app.ota.applyBytesCurrent / 1024UL),
+        static_cast<unsigned long>(app.ota.applyBytesTotal / 1024UL));
+    } else if (app.ota.applyBytesCurrent > 0) {
       snprintf(
         progressBuffer,
         sizeof(progressBuffer),
         "%lu KB scaricati",
-        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL));
+        static_cast<unsigned long>(app.ota.applyBytesCurrent / 1024UL));
     } else {
       strlcpy(progressBuffer, "avvio download...", sizeof(progressBuffer));
     }
@@ -37,30 +37,30 @@ static void buildOtaPopupText(char *buffer, size_t bufferSize) {
     snprintf(buffer, bufferSize,
       "Aggiornamento in corso.\nVersione corrente: %s\nVersione remota: %s\nProgresso: %s\n%s",
       FW_VERSION,
-      app.otaRemoteVersion[0] != '\0' ? app.otaRemoteVersion : "n/d",
+      app.ota.remoteVersion[0] != '\0' ? app.ota.remoteVersion : "n/d",
       progressBuffer,
-      app.otaApplyStatusText[0] != '\0' ? app.otaApplyStatusText : "Download firmware...");
+      app.ota.applyStatusText[0] != '\0' ? app.ota.applyStatusText : "Download firmware...");
     return;
   }
 
-  if (app.otaApplyState == OTA_APPLY_SUCCESS) {
+  if (app.ota.applyState == OTA_APPLY_SUCCESS) {
     snprintf(buffer, bufferSize,
       "Aggiornamento completato.\nVersione remota: %s\n%s",
-      app.otaRemoteVersion[0] != '\0' ? app.otaRemoteVersion : "n/d",
-      app.otaApplyStatusText[0] != '\0' ? app.otaApplyStatusText : "Riavvio imminente...");
+      app.ota.remoteVersion[0] != '\0' ? app.ota.remoteVersion : "n/d",
+      app.ota.applyStatusText[0] != '\0' ? app.ota.applyStatusText : "Riavvio imminente...");
     return;
   }
 
-  if (app.otaApplyState == OTA_APPLY_FAILED) {
+  if (app.ota.applyState == OTA_APPLY_FAILED) {
     snprintf(buffer, bufferSize,
       "Aggiornamento fallito.\nVersione remota: %s\n%s",
-      app.otaRemoteVersion[0] != '\0' ? app.otaRemoteVersion : "n/d",
-      app.otaApplyStatusText[0] != '\0' ? app.otaApplyStatusText : "Errore OTA.");
+      app.ota.remoteVersion[0] != '\0' ? app.ota.remoteVersion : "n/d",
+      app.ota.applyStatusText[0] != '\0' ? app.ota.applyStatusText : "Errore OTA.");
     return;
   }
 
-  if (app.otaState != SERVICE_FETCH_READY) {
-    switch (app.otaState) {
+  if (app.ota.state != SERVICE_FETCH_READY) {
+    switch (app.ota.state) {
       case SERVICE_FETCH_OFFLINE:
         snprintf(buffer, bufferSize,
           "OTA manifest non raggiungibile.\nStato: offline\nWi-Fi non connesso.");
@@ -75,7 +75,7 @@ static void buildOtaPopupText(char *buffer, size_t bufferSize) {
         return;
       case SERVICE_FETCH_HTTP_ERROR:
         snprintf(buffer, bufferSize,
-          "Manifest OTA non disponibile.\nHTTP %d.", app.otaLastHttpCode);
+          "Manifest OTA non disponibile.\nHTTP %d.", app.ota.lastHttpCode);
         return;
       case SERVICE_FETCH_INVALID_PAYLOAD:
         snprintf(buffer, bufferSize,
@@ -89,52 +89,52 @@ static void buildOtaPopupText(char *buffer, size_t bufferSize) {
     }
   }
 
-  switch (app.otaEligibility) {
+  switch (app.ota.eligibility) {
     case OTA_ELIGIBILITY_UPDATE_AVAILABLE:
       snprintf(buffer, bufferSize,
         "Aggiornamento disponibile.\nVersione corrente: %s\nVersione remota: %s\nBuild: %s\nDimensione: %s\nBatteria minima: %d%%",
         FW_VERSION,
-        app.otaRemoteVersion,
-        app.otaRemoteBuild[0] != '\0' ? app.otaRemoteBuild : "n/d",
+        app.ota.remoteVersion,
+        app.ota.remoteBuild[0] != '\0' ? app.ota.remoteBuild : "n/d",
         sizeBuffer,
-        app.otaMinBatteryPercent);
+        app.ota.minBatteryPercent);
       return;
     case OTA_ELIGIBILITY_UP_TO_DATE:
       snprintf(buffer, bufferSize,
         "Firmware aggiornato.\nVersione corrente: %s\nVersione remota: %s",
         FW_VERSION,
-        app.otaRemoteVersion);
+        app.ota.remoteVersion);
       return;
     case OTA_ELIGIBILITY_BATTERY_TOO_LOW:
       snprintf(buffer, bufferSize,
         "Aggiornamento trovato ma batteria insufficiente.\nVersione remota: %s\nMinimo richiesto: %d%%\nBatteria attuale: %d%%",
-        app.otaRemoteVersion,
-        app.otaMinBatteryPercent,
-        app.batteryPercent);
+        app.ota.remoteVersion,
+        app.ota.minBatteryPercent,
+        app.battery.percent);
       return;
     case OTA_ELIGIBILITY_BATTERY_UNKNOWN:
       snprintf(buffer, bufferSize,
         "Aggiornamento trovato ma livello batteria sconosciuto.\nVersione remota: %s\nMinimo richiesto: %d%%",
-        app.otaRemoteVersion,
-        app.otaMinBatteryPercent);
+        app.ota.remoteVersion,
+        app.ota.minBatteryPercent);
       return;
     case OTA_ELIGIBILITY_SLOT_TOO_SMALL:
       snprintf(buffer, bufferSize,
         "Manifest valido ma firmware troppo grande.\nVersione remota: %s\nDimensione: %s",
-        app.otaRemoteVersion,
+        app.ota.remoteVersion,
         sizeBuffer);
       return;
     case OTA_ELIGIBILITY_INCOMPATIBLE_BOARD:
       snprintf(buffer, bufferSize,
         "Manifest OTA per board diversa.\nAttesa: %s\nRemota: %s",
         FW_BOARD_ID,
-        app.otaRemoteVersion);
+        app.ota.remoteVersion);
       return;
     case OTA_ELIGIBILITY_INCOMPATIBLE_CHANNEL:
       snprintf(buffer, bufferSize,
         "Manifest OTA su canale diverso.\nCanale locale: %s\nVersione remota: %s",
         FW_RELEASE_CHANNEL,
-        app.otaRemoteVersion);
+        app.ota.remoteVersion);
       return;
     case OTA_ELIGIBILITY_INVALID:
     default:
@@ -195,17 +195,17 @@ void refreshOtaPopupUi() {
     return;
   }
 
-  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS || app.otaApplyState == OTA_APPLY_SUCCESS) {
+  if (app.ota.applyState == OTA_APPLY_IN_PROGRESS || app.ota.applyState == OTA_APPLY_SUCCESS) {
     lv_obj_add_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_HIDDEN);
     return;
   }
 
   lv_obj_clear_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_HIDDEN);
 
-  if (app.otaState == SERVICE_FETCH_READY && app.otaEligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
+  if (app.ota.state == SERVICE_FETCH_READY && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
     setDashboardLabelTextIfChanged(
       ui.otaPopupActionLabel,
-      app.otaApplyState == OTA_APPLY_FAILED ? "Riprova" : "Aggiorna");
+      app.ota.applyState == OTA_APPLY_FAILED ? "Riprova" : "Aggiorna");
     return;
   }
 
@@ -218,21 +218,21 @@ static void otaPopupActionEventCb(lv_event_t *e) {
     return;
   }
 
-  if (app.otaApplyRequested || app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+  if (app.ota.applyRequested || app.ota.applyState == OTA_APPLY_IN_PROGRESS) {
     return;
   }
 
-  if (app.otaState != SERVICE_FETCH_READY || app.otaEligibility != OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
+  if (app.ota.state != SERVICE_FETCH_READY || app.ota.eligibility != OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
     requestOtaManifestRefresh();
     refreshOtaPopupUi();
     return;
   }
 
-  app.otaApplyRequested = true;
-  app.otaApplyState = OTA_APPLY_IN_PROGRESS;
-  app.otaApplyProgressPercent = 0;
-  app.otaApplyLastErrorCode = 0;
-  strlcpy(app.otaApplyStatusText, "Preparazione OTA...", sizeof(app.otaApplyStatusText));
+  app.ota.applyRequested = true;
+  app.ota.applyState = OTA_APPLY_IN_PROGRESS;
+  app.ota.applyProgressPercent = 0;
+  app.ota.applyLastErrorCode = 0;
+  strlcpy(app.ota.applyStatusText, "Preparazione OTA...", sizeof(app.ota.applyStatusText));
   markUiDirty(UI_DIRTY_HEADER);
   refreshOtaPopupUi();
 }

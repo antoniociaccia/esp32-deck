@@ -92,53 +92,53 @@ void initBatteryMonitoring() {
 }
 
 void updateBatteryUi() {
-  if (!intervalElapsed(app.lastBatteryUpdateMs, TIMING_BATTERY_REFRESH_MS)) {
+  if (!intervalElapsed(app.battery.lastUpdateMs, TIMING_BATTERY_REFRESH_MS)) {
     return;
   }
 
-  bool previousBatteryPresent = app.batteryPresent;
-  int previousBatteryPercent = app.batteryPercent;
-  float previousBatteryVoltage = app.batteryVoltage;
+  bool previousBatteryPresent = app.battery.present;
+  int previousBatteryPercent = app.battery.percent;
+  float previousBatteryVoltage = app.battery.voltage;
   BatteryReading reading = readBatteryVoltage();
   float measuredVoltage = reading.voltage;
 
   if (!reading.present) {
-    app.batteryPresent = false;
-    app.batteryPercent = -1;
-    app.batteryVoltage = 0.0f;
-    if (previousBatteryPresent != app.batteryPresent
-      || previousBatteryPercent != app.batteryPercent
-      || previousBatteryVoltage != app.batteryVoltage) {
+    app.battery.present = false;
+    app.battery.percent = -1;
+    app.battery.voltage = 0.0f;
+    if (previousBatteryPresent != app.battery.present
+      || previousBatteryPercent != app.battery.percent
+      || previousBatteryVoltage != app.battery.voltage) {
       DEBUG_POWER_PRINT("[power] batteria assente o instabile");
       markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
     }
     return;
   }
 
-  if (!app.batteryInitialized) {
-    app.filteredBatteryVoltage = measuredVoltage;
-    app.batteryInitialized = true;
+  if (!app.battery.initialized) {
+    app.battery.filteredVoltage = measuredVoltage;
+    app.battery.initialized = true;
   } else {
-    float delta = measuredVoltage - app.filteredBatteryVoltage;
+    float delta = measuredVoltage - app.battery.filteredVoltage;
     if (delta > POWER_BATTERY_MAX_STEP_VOLTS) {
-      measuredVoltage = app.filteredBatteryVoltage + POWER_BATTERY_MAX_STEP_VOLTS;
+      measuredVoltage = app.battery.filteredVoltage + POWER_BATTERY_MAX_STEP_VOLTS;
     } else if (delta < -POWER_BATTERY_MAX_STEP_VOLTS) {
-      measuredVoltage = app.filteredBatteryVoltage - POWER_BATTERY_MAX_STEP_VOLTS;
+      measuredVoltage = app.battery.filteredVoltage - POWER_BATTERY_MAX_STEP_VOLTS;
     }
 
-    app.filteredBatteryVoltage = (POWER_BATTERY_FILTER_ALPHA * measuredVoltage) +
-      ((1.0f - POWER_BATTERY_FILTER_ALPHA) * app.filteredBatteryVoltage);
+    app.battery.filteredVoltage = (POWER_BATTERY_FILTER_ALPHA * measuredVoltage) +
+      ((1.0f - POWER_BATTERY_FILTER_ALPHA) * app.battery.filteredVoltage);
   }
 
-  int batteryPercent = batteryPercentFromVoltage(app.filteredBatteryVoltage);
-  app.batteryPresent = true;
-  app.batteryPercent = batteryPercent;
-  app.batteryVoltage = app.filteredBatteryVoltage;
+  int batteryPercent = batteryPercentFromVoltage(app.battery.filteredVoltage);
+  app.battery.present = true;
+  app.battery.percent = batteryPercent;
+  app.battery.voltage = app.battery.filteredVoltage;
 
-  if (previousBatteryPresent != app.batteryPresent
-    || previousBatteryPercent != app.batteryPercent
-    || previousBatteryVoltage != app.batteryVoltage) {
-    DEBUG_POWER_PRINTF("[power] %.2fV %d%%\n", app.batteryVoltage, app.batteryPercent);
+  if (previousBatteryPresent != app.battery.present
+    || previousBatteryPercent != app.battery.percent
+    || previousBatteryVoltage != app.battery.voltage) {
+    DEBUG_POWER_PRINTF("[power] %.2fV %d%%\n", app.battery.voltage, app.battery.percent);
     markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
   }
 }

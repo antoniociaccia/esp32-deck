@@ -79,50 +79,70 @@ struct UiRefs {
   lv_obj_t *otaPopupActionLabel = nullptr;
 };
 
+struct ClockState {
+  unsigned long lastUpdateMs = 0;
+  unsigned long lastSyncAttemptMs = 0;
+  bool synced = false;
+  char labelText[24] = {};
+};
+
+struct BatteryState {
+  unsigned long lastUpdateMs = 0;
+  float filteredVoltage = 0.0f;
+  bool initialized = false;
+  bool present = false;
+  int percent = -1;
+  float voltage = 0.0f;
+};
+
+struct WeatherState {
+  unsigned long lastUpdateMs = 0;
+  bool valid = false;
+  ServiceFetchState state = SERVICE_FETCH_IDLE;
+  int lastHttpCode = 0;
+  int temperatureC = 0;
+  char labelText[32] = {};
+  char iconCode[8] = {};
+};
+
+struct NewsState {
+  unsigned long lastFetchMs = 0;
+  bool valid = false;
+  ServiceFetchState state = SERVICE_FETCH_IDLE;
+  int lastHttpCode = 0;
+  int itemCount = 0;
+  char items[NEWS_MAX_ITEMS][NEWS_MAX_TEXT_LEN] = {};
+  char ticker[NEWS_MAX_TICKER_LEN] = {};
+};
+
+struct OtaState {
+  unsigned long lastCheckMs = 0;
+  bool manifestValid = false;
+  ServiceFetchState state = SERVICE_FETCH_IDLE;
+  int lastHttpCode = 0;
+  OtaEligibility eligibility = OTA_ELIGIBILITY_INVALID;
+  uint32_t remoteSizeBytes = 0;
+  int minBatteryPercent = 0;
+  char remoteVersion[OTA_VERSION_MAX_LEN] = {};
+  char remoteBuild[OTA_BUILD_MAX_LEN] = {};
+  char remoteBinUrl[OTA_BIN_URL_MAX_LEN] = {};
+  bool applyRequested = false;
+  OtaApplyState applyState = OTA_APPLY_IDLE;
+  int applyProgressPercent = -1;
+  uint32_t applyBytesCurrent = 0;
+  uint32_t applyBytesTotal = 0;
+  int applyLastErrorCode = 0;
+  char applyStatusText[96] = {};
+};
+
 struct AppState {
-  unsigned long lastClockUpdateMs = 0;
-  unsigned long lastTimeSyncAttemptMs = 0;
-  unsigned long lastBatteryUpdateMs = 0;
-  unsigned long lastWeatherUpdateMs = 0;
-  unsigned long lastNewsFetchMs = 0;
-  unsigned long lastOtaCheckMs = 0;
-  unsigned long lastSafeHeartbeatMs = 0;
+  ClockState clock;
+  BatteryState battery;
+  WeatherState weather;
+  NewsState news;
+  OtaState ota;
   int currentModuleIndex = 0;
-  bool timeSynced = false;
-  float filteredBatteryVoltage = 0.0f;
-  bool batteryInitialized = false;
-  bool batteryPresent = false;
-  int batteryPercent = -1;
-  float batteryVoltage = 0.0f;
-  bool weatherValid = false;
-  ServiceFetchState weatherState = SERVICE_FETCH_IDLE;
-  int weatherLastHttpCode = 0;
-  int weatherTemperatureC = 0;
-  char clockLabelText[24] = {};
-  char weatherLabelText[32] = {};
-  char weatherIconCode[8] = {};
-  bool newsValid = false;
-  ServiceFetchState newsState = SERVICE_FETCH_IDLE;
-  int newsLastHttpCode = 0;
-  int newsItemCount = 0;
-  char newsItems[NEWS_MAX_ITEMS][NEWS_MAX_TEXT_LEN] = {};
-  char newsTicker[NEWS_MAX_TICKER_LEN] = {};
-  bool otaManifestValid = false;
-  ServiceFetchState otaState = SERVICE_FETCH_IDLE;
-  int otaLastHttpCode = 0;
-  OtaEligibility otaEligibility = OTA_ELIGIBILITY_INVALID;
-  uint32_t otaRemoteSizeBytes = 0;
-  int otaMinBatteryPercent = 0;
-  char otaRemoteVersion[OTA_VERSION_MAX_LEN] = {};
-  char otaRemoteBuild[OTA_BUILD_MAX_LEN] = {};
-  char otaRemoteBinUrl[OTA_BIN_URL_MAX_LEN] = {};
-  bool otaApplyRequested = false;
-  OtaApplyState otaApplyState = OTA_APPLY_IDLE;
-  int otaApplyProgressPercent = -1;
-  uint32_t otaApplyBytesCurrent = 0;
-  uint32_t otaApplyBytesTotal = 0;
-  int otaApplyLastErrorCode = 0;
-  char otaApplyStatusText[96] = {};
+  unsigned long lastSafeHeartbeatMs = 0;
   uint32_t uiDirtyMask = UI_DIRTY_ALL;
 };
 

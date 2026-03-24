@@ -8,8 +8,8 @@
 
 static void testSetDefaultNewsItems() {
   setDefaultNewsItems();
-  assert(app.newsItemCount == NEWS_DEFAULT_ITEM_COUNT);
-  assert(std::strlen(app.newsTicker) > 0);
+  assert(app.news.itemCount == NEWS_DEFAULT_ITEM_COUNT);
+  assert(std::strlen(app.news.ticker) > 0);
 }
 
 static void testParseWeatherPayloadSuccess() {
@@ -57,44 +57,44 @@ static void testParseNewsItemsSuccess() {
     String("{\"items\":[{\"text\":\"TECH | Primo titolo\"},{\"text\":\"WORLD | Riga con\\nspazio\"},{\"text\":\"ITALIA | Voce con \\\"quote\\\"\"}]}"));
 
   assert(ok);
-  assert(app.newsItemCount == 3);
-  assert(std::strcmp(app.newsItems[0], "TECH | Primo titolo") == 0);
-  assert(std::strcmp(app.newsItems[1], "WORLD | Riga con spazio") == 0);
-  assert(std::strcmp(app.newsItems[2], "ITALIA | Voce con \"quote\"") == 0);
-  assert(std::strstr(app.newsTicker, "Primo titolo") != nullptr);
+  assert(app.news.itemCount == 3);
+  assert(std::strcmp(app.news.items[0], "TECH | Primo titolo") == 0);
+  assert(std::strcmp(app.news.items[1], "WORLD | Riga con spazio") == 0);
+  assert(std::strcmp(app.news.items[2], "ITALIA | Voce con \"quote\"") == 0);
+  assert(std::strstr(app.news.ticker, "Primo titolo") != nullptr);
 }
 
 static void testParseNewsItemsFailure() {
   setDefaultNewsItems();
-  int previousCount = app.newsItemCount;
+  int previousCount = app.news.itemCount;
   char previousTicker[NEWS_MAX_TICKER_LEN];
-  strlcpy(previousTicker, app.newsTicker, sizeof(previousTicker));
+  strlcpy(previousTicker, app.news.ticker, sizeof(previousTicker));
 
   bool ok = parseNewsItems(String("{\"items\":\"not-an-array\"}"));
 
   assert(!ok);
-  assert(app.newsItemCount == previousCount);
-  assert(std::strcmp(app.newsTicker, previousTicker) == 0);
+  assert(app.news.itemCount == previousCount);
+  assert(std::strcmp(app.news.ticker, previousTicker) == 0);
 }
 
 static void testBuildNewsFooterTextReady() {
   bool ok = parseNewsItems(String("{\"items\":[{\"text\":\"TECH | Footer live\"}]}"));
   assert(ok);
-  app.newsState = SERVICE_FETCH_READY;
-  app.newsLastHttpCode = 200;
+  app.news.state = SERVICE_FETCH_READY;
+  app.news.lastHttpCode = 200;
 
   char footer[NEWS_MAX_TICKER_LEN];
   buildNewsFooterText(footer, sizeof(footer));
 
-  assert(std::strcmp(footer, app.newsTicker) == 0);
+  assert(std::strcmp(footer, app.news.ticker) == 0);
 }
 
 static void testBuildNewsFooterTextCachedHttpError() {
   bool ok = parseNewsItems(String("{\"items\":[{\"text\":\"TECH | Cached titolo\"}]}"));
   assert(ok);
-  app.newsValid = false;
-  app.newsState = SERVICE_FETCH_HTTP_ERROR;
-  app.newsLastHttpCode = 503;
+  app.news.valid = false;
+  app.news.state = SERVICE_FETCH_HTTP_ERROR;
+  app.news.lastHttpCode = 503;
 
   char footer[NEWS_MAX_TICKER_LEN];
   buildNewsFooterText(footer, sizeof(footer));
@@ -105,11 +105,11 @@ static void testBuildNewsFooterTextCachedHttpError() {
 }
 
 static void testBuildNewsFooterTextOfflineNoCache() {
-  app.newsItemCount = 0;
-  app.newsTicker[0] = '\0';
-  app.newsValid = false;
-  app.newsState = SERVICE_FETCH_OFFLINE;
-  app.newsLastHttpCode = 0;
+  app.news.itemCount = 0;
+  app.news.ticker[0] = '\0';
+  app.news.valid = false;
+  app.news.state = SERVICE_FETCH_OFFLINE;
+  app.news.lastHttpCode = 0;
 
   char footer[NEWS_MAX_TICKER_LEN];
   buildNewsFooterText(footer, sizeof(footer));

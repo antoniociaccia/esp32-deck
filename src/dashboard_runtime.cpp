@@ -43,24 +43,24 @@ void initializeDashboard(Display &screen) {
   DEBUG_BOOT_PRINT("[boot] display init ok");
 
   app.currentModuleIndex = UI_DEFAULT_MODULE_INDEX;
-  strlcpy(app.clockLabelText, "sync orario...", sizeof(app.clockLabelText));
-  strlcpy(app.weatherLabelText, "meteo n/d", sizeof(app.weatherLabelText));
-  app.weatherIconCode[0] = '\0';
-  app.weatherState = SERVICE_FETCH_IDLE;
-  app.weatherLastHttpCode = 0;
-  app.newsState = SERVICE_FETCH_IDLE;
-  app.newsLastHttpCode = 0;
-  app.otaState = SERVICE_FETCH_IDLE;
-  app.otaLastHttpCode = 0;
-  app.otaEligibility = OTA_ELIGIBILITY_INVALID;
-  app.otaRemoteBinUrl[0] = '\0';
-  app.otaApplyRequested = false;
-  app.otaApplyState = OTA_APPLY_IDLE;
-  app.otaApplyProgressPercent = -1;
-  app.otaApplyBytesCurrent = 0;
-  app.otaApplyBytesTotal = 0;
-  app.otaApplyLastErrorCode = 0;
-  app.otaApplyStatusText[0] = '\0';
+  strlcpy(app.clock.labelText, "sync orario...", sizeof(app.clock.labelText));
+  strlcpy(app.weather.labelText, "meteo n/d", sizeof(app.weather.labelText));
+  app.weather.iconCode[0] = '\0';
+  app.weather.state = SERVICE_FETCH_IDLE;
+  app.weather.lastHttpCode = 0;
+  app.news.state = SERVICE_FETCH_IDLE;
+  app.news.lastHttpCode = 0;
+  app.ota.state = SERVICE_FETCH_IDLE;
+  app.ota.lastHttpCode = 0;
+  app.ota.eligibility = OTA_ELIGIBILITY_INVALID;
+  app.ota.remoteBinUrl[0] = '\0';
+  app.ota.applyRequested = false;
+  app.ota.applyState = OTA_APPLY_IDLE;
+  app.ota.applyProgressPercent = -1;
+  app.ota.applyBytesCurrent = 0;
+  app.ota.applyBytesTotal = 0;
+  app.ota.applyLastErrorCode = 0;
+  app.ota.applyStatusText[0] = '\0';
   setDefaultNewsItems();
   createDashboardUi();
   DEBUG_BOOT_PRINT("[boot] ui ok");
@@ -90,7 +90,7 @@ void runDashboardLoop(Display &screen) {
   updateBatteryUi();
   updateWeatherUi();
   updateNewsFeed();
-  if (app.otaApplyRequested) {
+  if (app.ota.applyRequested) {
     startOtaFirmwareUpdate();
   }
   updateOtaManifestCheck();

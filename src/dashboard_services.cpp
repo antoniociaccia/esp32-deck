@@ -18,23 +18,23 @@ void prepareSecureHttpClient(HTTPClient &http, WiFiClientSecure &client) {
 }
 
 void updateClockUi() {
-  if (!intervalElapsed(app.lastClockUpdateMs, TIMING_CLOCK_REFRESH_MS)) {
+  if (!intervalElapsed(app.clock.lastUpdateMs, TIMING_CLOCK_REFRESH_MS)) {
     return;
   }
 
-  char previousClockText[sizeof(app.clockLabelText)];
-  strlcpy(previousClockText, app.clockLabelText, sizeof(previousClockText));
-  bool previousTimeSynced = app.timeSynced;
+  char previousClockText[sizeof(app.clock.labelText)];
+  strlcpy(previousClockText, app.clock.labelText, sizeof(previousClockText));
+  bool previousTimeSynced = app.clock.synced;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 10)) {
-    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "%02d/%02d %02d:%02d",
+    snprintf(app.clock.labelText, sizeof(app.clock.labelText), "%02d/%02d %02d:%02d",
       timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_hour, timeinfo.tm_min);
-    app.timeSynced = true;
+    app.clock.synced = true;
   } else {
-    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "sync orario...");
+    snprintf(app.clock.labelText, sizeof(app.clock.labelText), "sync orario...");
   }
 
-  if (strcmp(previousClockText, app.clockLabelText) != 0 || previousTimeSynced != app.timeSynced) {
+  if (strcmp(previousClockText, app.clock.labelText) != 0 || previousTimeSynced != app.clock.synced) {
     markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_CLOCK);
   }
 }
@@ -51,23 +51,23 @@ static void ensureWifiConnection() {
 void beginTimeSync() {
   if (strlen(WIFI_SSID) == 0) {
     DEBUG_NETWORK_PRINT("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
-    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "config WiFi");
+    snprintf(app.clock.labelText, sizeof(app.clock.labelText), "config WiFi");
     return;
   }
 
   ensureWifiConnection();
   DEBUG_NETWORK_PRINT("Connessione WiFi per NTP...");
   configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
-  app.lastTimeSyncAttemptMs = millis();
+  app.clock.lastSyncAttemptMs = millis();
 }
 
 void maintainTimeSync() {
-  if (app.timeSynced) {
+  if (app.clock.synced) {
     return;
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    if (millis() - app.lastTimeSyncAttemptMs > TIMING_WIFI_RECONNECT_MS) {
+    if (millis() - app.clock.lastSyncAttemptMs > TIMING_WIFI_RECONNECT_MS) {
       beginTimeSync();
     }
     return;
@@ -75,15 +75,15 @@ void maintainTimeSync() {
 
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 10)) {
-    app.timeSynced = true;
+    app.clock.synced = true;
     DEBUG_NETWORK_PRINT("Orario NTP sincronizzato");
     updateClockUi();
     return;
   }
 
-  if (millis() - app.lastTimeSyncAttemptMs > TIMING_NTP_RETRY_MS) {
+  if (millis() - app.clock.lastSyncAttemptMs > TIMING_NTP_RETRY_MS) {
     DEBUG_NETWORK_PRINT("Ritento sync NTP");
     configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
-    app.lastTimeSyncAttemptMs = millis();
+    app.clock.lastSyncAttemptMs = millis();
   }
 }

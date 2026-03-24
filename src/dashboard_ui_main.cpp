@@ -168,31 +168,31 @@ static void updateModuleTileStates() {
 }
 
 static const void *weatherCardImageSource() {
-  if (strncmp(app.weatherIconCode, "01", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "01", 2) == 0) {
     return &IMG_WEATHER_SUN;
   }
-  if (strncmp(app.weatherIconCode, "02", 2) == 0
-    || strncmp(app.weatherIconCode, "03", 2) == 0
-    || strncmp(app.weatherIconCode, "04", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "02", 2) == 0
+    || strncmp(app.weather.iconCode, "03", 2) == 0
+    || strncmp(app.weather.iconCode, "04", 2) == 0) {
     return &IMG_WEATHER_CLOUD;
   }
-  if (strncmp(app.weatherIconCode, "09", 2) == 0 || strncmp(app.weatherIconCode, "10", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "09", 2) == 0 || strncmp(app.weather.iconCode, "10", 2) == 0) {
     return &IMG_WEATHER_RAIN;
   }
-  if (strncmp(app.weatherIconCode, "11", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "11", 2) == 0) {
     return &IMG_WEATHER_STORM;
   }
-  if (strncmp(app.weatherIconCode, "13", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "13", 2) == 0) {
     return &IMG_WEATHER_SNOW;
   }
-  if (strncmp(app.weatherIconCode, "50", 2) == 0) {
+  if (strncmp(app.weather.iconCode, "50", 2) == 0) {
     return &IMG_WEATHER_FOG;
   }
   return &IMG_WEATHER_CLOUD;
 }
 
 static void buildNewsPreview(char *buffer, size_t bufferSize) {
-  const char *headline = app.newsItemCount > 0 ? app.newsItems[0] : "Feed news non disponibile";
+  const char *headline = app.news.itemCount > 0 ? app.news.items[0] : "Feed news non disponibile";
   size_t headlineLen = strlen(headline);
   if (headlineLen < bufferSize) {
     strlcpy(buffer, headline, bufferSize);
@@ -463,13 +463,13 @@ static void updateClockModuleCard() {
   const bool online = wifiOnline();
   snprintf(metaBuffer, sizeof(metaBuffer), "%s | %s",
     online ? "wifi ok" : "wifi off",
-    app.timeSynced ? "ntp ok" : "ntp retry");
+    app.clock.synced ? "ntp ok" : "ntp retry");
 
-  const char *clockText = strlen(app.clockLabelText) > 0 ? app.clockLabelText : "sync...";
+  const char *clockText = strlen(app.clock.labelText) > 0 ? app.clock.labelText : "sync...";
   setDashboardLabelTextIfChanged(ui.moduleValueLabels[1], clockText);
   setDashboardLabelTextIfChanged(ui.moduleMetaLabels[1], metaBuffer);
 
-  if (app.timeSynced) {
+  if (app.clock.synced) {
     setModuleIconLabel(1, LV_SYMBOL_OK, UI_COLOR_ACCENT);
     setModuleBadge(1, "ok", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
   } else if (online) {
@@ -489,19 +489,19 @@ static void updatePowerModuleCard() {
   char valueBuffer[24];
   char metaBuffer[48];
 
-    if (!app.batteryPresent || app.batteryPercent < 0) {
+    if (!app.battery.present || app.battery.percent < 0) {
     strlcpy(valueBuffer, "--", sizeof(valueBuffer));
     strlcpy(metaBuffer, "batteria assente o instabile", sizeof(metaBuffer));
     setModuleIconLabel(2, LV_SYMBOL_BATTERY_EMPTY, UI_COLOR_TEXT_MUTED);
     setModuleBadge(2, "probe", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
   } else {
-    snprintf(valueBuffer, sizeof(valueBuffer), "%d%%", app.batteryPercent);
-    snprintf(metaBuffer, sizeof(metaBuffer), "%.2fV filtrata", app.batteryVoltage);
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d%%", app.battery.percent);
+    snprintf(metaBuffer, sizeof(metaBuffer), "%.2fV filtrata", app.battery.voltage);
 
-      if (app.batteryPercent >= 85) {
+      if (app.battery.percent >= 85) {
       setModuleIconLabel(2, LV_SYMBOL_BATTERY_FULL, UI_COLOR_ACCENT);
       setModuleBadge(2, "ok", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
-    } else if (app.batteryPercent >= 25) {
+    } else if (app.battery.percent >= 25) {
       setModuleIconLabel(2, LV_SYMBOL_BATTERY_2, UI_COLOR_CARD_ICON_SOFT);
       setModuleBadge(2, "watch", UI_COLOR_BADGE_RETRY_BG, UI_COLOR_ACCENT);
     } else {
@@ -522,12 +522,12 @@ static void updateWeatherModuleCard() {
   char valueBuffer[24];
   char metaBuffer[64];
 
-  if (app.weatherState == SERVICE_FETCH_READY && app.weatherValid) {
-    snprintf(valueBuffer, sizeof(valueBuffer), "%dC", app.weatherTemperatureC);
+  if (app.weather.state == SERVICE_FETCH_READY && app.weather.valid) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%dC", app.weather.temperatureC);
     snprintf(metaBuffer, sizeof(metaBuffer), "%s | feed live", WEATHER_CITY_LABEL);
   } else {
     strlcpy(valueBuffer, "--", sizeof(valueBuffer));
-    switch (app.weatherState) {
+    switch (app.weather.state) {
       case SERVICE_FETCH_OFFLINE:
         snprintf(metaBuffer, sizeof(metaBuffer), "%s | Wi-Fi assente", WEATHER_CITY_LABEL);
         break;
@@ -538,7 +538,7 @@ static void updateWeatherModuleCard() {
         snprintf(metaBuffer, sizeof(metaBuffer), "%s | richiesta fallita", WEATHER_CITY_LABEL);
         break;
       case SERVICE_FETCH_HTTP_ERROR:
-        snprintf(metaBuffer, sizeof(metaBuffer), "%s | HTTP %d", WEATHER_CITY_LABEL, app.weatherLastHttpCode);
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | HTTP %d", WEATHER_CITY_LABEL, app.weather.lastHttpCode);
         break;
       case SERVICE_FETCH_INVALID_PAYLOAD:
         snprintf(metaBuffer, sizeof(metaBuffer), "%s | payload non valido", WEATHER_CITY_LABEL);
@@ -557,7 +557,7 @@ static void updateWeatherModuleCard() {
   }
   setDashboardLabelTextIfChanged(ui.moduleValueLabels[3], valueBuffer);
   setDashboardLabelTextIfChanged(ui.moduleMetaLabels[3], metaBuffer);
-  setServiceBadgeFromState(3, app.weatherState);
+  setServiceBadgeFromState(3, app.weather.state);
 }
 
 static void updateNewsModuleCard() {
@@ -568,15 +568,15 @@ static void updateNewsModuleCard() {
   char valueBuffer[24];
   char headlineBuffer[UI_NEWS_PREVIEW_MAX_LEN];
 
-  if (app.newsState == SERVICE_FETCH_READY) {
-    snprintf(valueBuffer, sizeof(valueBuffer), "%d news", app.newsItemCount);
-  } else if (app.newsItemCount > 0) {
-    snprintf(valueBuffer, sizeof(valueBuffer), "%d cached", app.newsItemCount);
+  if (app.news.state == SERVICE_FETCH_READY) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d news", app.news.itemCount);
+  } else if (app.news.itemCount > 0) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d cached", app.news.itemCount);
   } else {
     strlcpy(valueBuffer, "0 news", sizeof(valueBuffer));
   }
 
-  switch (app.newsState) {
+  switch (app.news.state) {
     case SERVICE_FETCH_READY:
       buildNewsPreview(headlineBuffer, sizeof(headlineBuffer));
       break;
@@ -590,7 +590,7 @@ static void updateNewsModuleCard() {
       strlcpy(headlineBuffer, "Feed fermo: webhook non raggiungibile", sizeof(headlineBuffer));
       break;
     case SERVICE_FETCH_HTTP_ERROR:
-      snprintf(headlineBuffer, sizeof(headlineBuffer), "Feed fermo: HTTP %d", app.newsLastHttpCode);
+      snprintf(headlineBuffer, sizeof(headlineBuffer), "Feed fermo: HTTP %d", app.news.lastHttpCode);
       break;
     case SERVICE_FETCH_INVALID_PAYLOAD:
       strlcpy(headlineBuffer, "Feed fermo: payload news non valido", sizeof(headlineBuffer));
@@ -604,7 +604,7 @@ static void updateNewsModuleCard() {
   setDashboardLabelTextIfChanged(ui.moduleValueLabels[4], valueBuffer);
   setDashboardLabelTextIfChanged(ui.moduleMetaLabels[4], headlineBuffer);
 
-  switch (app.newsState) {
+  switch (app.news.state) {
     case SERVICE_FETCH_READY:
       setModuleIconLabel(4, LV_SYMBOL_BELL, UI_COLOR_CARD_ICON_SOFT);
       break;
@@ -622,7 +622,7 @@ static void updateNewsModuleCard() {
       setModuleIconLabel(4, LV_SYMBOL_REFRESH, UI_COLOR_CARD_ICON_SOFT);
       break;
   }
-  setServiceBadgeFromState(4, app.newsState);
+  setServiceBadgeFromState(4, app.news.state);
 }
 
 static void tileviewEventCb(lv_event_t *e) {

@@ -16,12 +16,12 @@ static bool weatherUiStateChanged(
   int previousTemperature,
   const char *previousWeatherText,
   const char *previousWeatherIconCode) {
-  return previousState != app.weatherState
-    || previousHttpCode != app.weatherLastHttpCode
-    || previousValid != app.weatherValid
-    || previousTemperature != app.weatherTemperatureC
-    || strcmp(previousWeatherText, app.weatherLabelText) != 0
-    || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0;
+  return previousState != app.weather.state
+    || previousHttpCode != app.weather.lastHttpCode
+    || previousValid != app.weather.valid
+    || previousTemperature != app.weather.temperatureC
+    || strcmp(previousWeatherText, app.weather.labelText) != 0
+    || strcmp(previousWeatherIconCode, app.weather.iconCode) != 0;
 }
 
 static void markWeatherUiDirtyIfChanged(
@@ -61,20 +61,20 @@ static void logWeatherStateIfChanged(
 
   DEBUG_NETWORK_PRINTF(
     "Weather state=%s http=%d valid=%d temp=%d label='%s'\n",
-    serviceFetchStateLabel(app.weatherState),
-    app.weatherLastHttpCode,
-    app.weatherValid ? 1 : 0,
-    app.weatherTemperatureC,
-    app.weatherLabelText);
+    serviceFetchStateLabel(app.weather.state),
+    app.weather.lastHttpCode,
+    app.weather.valid ? 1 : 0,
+    app.weather.temperatureC,
+    app.weather.labelText);
 }
 
 static void setWeatherFetchFailure(ServiceFetchState state, const char *labelText, int httpCode = 0) {
-  app.weatherValid = false;
-  app.weatherState = state;
-  app.weatherLastHttpCode = httpCode;
-  app.weatherTemperatureC = 0;
-  strlcpy(app.weatherLabelText, labelText, sizeof(app.weatherLabelText));
-  app.weatherIconCode[0] = '\0';
+  app.weather.valid = false;
+  app.weather.state = state;
+  app.weather.lastHttpCode = httpCode;
+  app.weather.temperatureC = 0;
+  strlcpy(app.weather.labelText, labelText, sizeof(app.weather.labelText));
+  app.weather.iconCode[0] = '\0';
 }
 
 static String buildWeatherUrl() {
@@ -115,16 +115,16 @@ static bool handleWeatherTestMode(
     case NETWORK_TEST_MODE_SUCCESS_MOCK: {
       static const String mockPayload = "{\"main\":{\"temp\":21},\"weather\":[{\"icon\":\"01d\"}]}";
       int temperature = 0;
-      char iconCode[sizeof(app.weatherIconCode)] = {};
+      char iconCode[sizeof(app.weather.iconCode)] = {};
       if (!parseWeatherPayload(mockPayload, temperature, iconCode, sizeof(iconCode))) {
         setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
       } else {
-        snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
-        strlcpy(app.weatherIconCode, iconCode, sizeof(app.weatherIconCode));
-        app.weatherValid = true;
-        app.weatherState = SERVICE_FETCH_READY;
-        app.weatherLastHttpCode = HTTP_CODE_OK;
-        app.weatherTemperatureC = temperature;
+        snprintf(app.weather.labelText, sizeof(app.weather.labelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
+        strlcpy(app.weather.iconCode, iconCode, sizeof(app.weather.iconCode));
+        app.weather.valid = true;
+        app.weather.state = SERVICE_FETCH_READY;
+        app.weather.lastHttpCode = HTTP_CODE_OK;
+        app.weather.temperatureC = temperature;
       }
       break;
     }
@@ -139,19 +139,19 @@ static bool handleWeatherTestMode(
 }
 
 void updateWeatherUi() {
-  unsigned long refreshInterval = app.weatherValid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
-  if (!intervalElapsed(app.lastWeatherUpdateMs, refreshInterval)) {
+  unsigned long refreshInterval = app.weather.valid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
+  if (!intervalElapsed(app.weather.lastUpdateMs, refreshInterval)) {
     return;
   }
 
-  char previousWeatherText[sizeof(app.weatherLabelText)];
-  char previousWeatherIconCode[sizeof(app.weatherIconCode)];
-  strlcpy(previousWeatherText, app.weatherLabelText, sizeof(previousWeatherText));
-  strlcpy(previousWeatherIconCode, app.weatherIconCode, sizeof(previousWeatherIconCode));
-  bool previousWeatherValid = app.weatherValid;
-  ServiceFetchState previousWeatherState = app.weatherState;
-  int previousWeatherHttpCode = app.weatherLastHttpCode;
-  int previousWeatherTemperature = app.weatherTemperatureC;
+  char previousWeatherText[sizeof(app.weather.labelText)];
+  char previousWeatherIconCode[sizeof(app.weather.iconCode)];
+  strlcpy(previousWeatherText, app.weather.labelText, sizeof(previousWeatherText));
+  strlcpy(previousWeatherIconCode, app.weather.iconCode, sizeof(previousWeatherIconCode));
+  bool previousWeatherValid = app.weather.valid;
+  ServiceFetchState previousWeatherState = app.weather.state;
+  int previousWeatherHttpCode = app.weather.lastHttpCode;
+  int previousWeatherTemperature = app.weather.temperatureC;
 
   if (handleWeatherTestMode(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode)) {
@@ -203,7 +203,7 @@ void updateWeatherUi() {
   http.end();
 
   int temperature = 0;
-  char iconCode[sizeof(app.weatherIconCode)] = {};
+  char iconCode[sizeof(app.weather.iconCode)] = {};
   if (!parseWeatherPayload(payload, temperature, iconCode, sizeof(iconCode))) {
     setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
     logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
@@ -213,12 +213,12 @@ void updateWeatherUi() {
     return;
   }
 
-  snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
-  strlcpy(app.weatherIconCode, iconCode, sizeof(app.weatherIconCode));
-  app.weatherValid = true;
-  app.weatherState = SERVICE_FETCH_READY;
-  app.weatherLastHttpCode = httpCode;
-  app.weatherTemperatureC = temperature;
+  snprintf(app.weather.labelText, sizeof(app.weather.labelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
+  strlcpy(app.weather.iconCode, iconCode, sizeof(app.weather.iconCode));
+  app.weather.valid = true;
+  app.weather.state = SERVICE_FETCH_READY;
+  app.weather.lastHttpCode = httpCode;
+  app.weather.temperatureC = temperature;
 
   logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
     previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);

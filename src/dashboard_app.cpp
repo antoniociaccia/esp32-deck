@@ -260,20 +260,20 @@ void normalizeNewsText(String &text) {
 }
 
 void rebuildNewsTicker() {
-  app.newsTicker[0] = '\0';
-  for (int i = 0; i < app.newsItemCount; ++i) {
+  app.news.ticker[0] = '\0';
+  for (int i = 0; i < app.news.itemCount; ++i) {
     if (i > 0) {
-      strlcat(app.newsTicker, "     •     ", NEWS_MAX_TICKER_LEN);
+      strlcat(app.news.ticker, "     •     ", NEWS_MAX_TICKER_LEN);
     }
-    strlcat(app.newsTicker, app.newsItems[i], NEWS_MAX_TICKER_LEN);
+    strlcat(app.news.ticker, app.news.items[i], NEWS_MAX_TICKER_LEN);
   }
 
 }
 
 void setDefaultNewsItems() {
-  app.newsItemCount = NEWS_DEFAULT_ITEM_COUNT;
+  app.news.itemCount = NEWS_DEFAULT_ITEM_COUNT;
   for (int i = 0; i < NEWS_DEFAULT_ITEM_COUNT; ++i) {
-    strlcpy(app.newsItems[i], DEFAULT_NEWS_ITEMS[i], NEWS_MAX_TEXT_LEN);
+    strlcpy(app.news.items[i], DEFAULT_NEWS_ITEMS[i], NEWS_MAX_TEXT_LEN);
   }
   rebuildNewsTicker();
 }
@@ -305,16 +305,16 @@ void buildNewsFooterText(char *buffer, size_t bufferSize) {
 
   buffer[0] = '\0';
 
-  if (app.newsState == SERVICE_FETCH_READY) {
-    if (app.newsTicker[0] != '\0') {
-      strlcpy(buffer, app.newsTicker, bufferSize);
+  if (app.news.state == SERVICE_FETCH_READY) {
+    if (app.news.ticker[0] != '\0') {
+      strlcpy(buffer, app.news.ticker, bufferSize);
     } else {
       strlcpy(buffer, "NEWS | feed live ma vuoto", bufferSize);
     }
     return;
   }
 
-  switch (app.newsState) {
+  switch (app.news.state) {
     case SERVICE_FETCH_IDLE:
       strlcpy(buffer, "NEWS | attesa primo aggiornamento", bufferSize);
       break;
@@ -328,7 +328,7 @@ void buildNewsFooterText(char *buffer, size_t bufferSize) {
       strlcpy(buffer, "NEWS | errore rete", bufferSize);
       break;
     case SERVICE_FETCH_HTTP_ERROR:
-      snprintf(buffer, bufferSize, "NEWS | HTTP %d", app.newsLastHttpCode);
+      snprintf(buffer, bufferSize, "NEWS | HTTP %d", app.news.lastHttpCode);
       break;
     case SERVICE_FETCH_INVALID_PAYLOAD:
       strlcpy(buffer, "NEWS | payload non valido", bufferSize);
@@ -339,9 +339,9 @@ void buildNewsFooterText(char *buffer, size_t bufferSize) {
       break;
   }
 
-  if (app.newsItemCount > 0 && app.newsTicker[0] != '\0') {
+  if (app.news.itemCount > 0 && app.news.ticker[0] != '\0') {
     strlcat(buffer, " | cache | ", bufferSize);
-    strlcat(buffer, app.newsTicker, bufferSize);
+    strlcat(buffer, app.news.ticker, bufferSize);
   } else {
     strlcat(buffer, " | nessun feed disponibile", bufferSize);
   }
@@ -414,7 +414,7 @@ bool parseNewsItems(const String &payload) {
     String decoded = decodeJsonString(payload.substring(startQuote + 1, endQuote));
     normalizeNewsText(decoded);
     if (decoded.length() > 0) {
-      strlcpy(app.newsItems[parsedCount], decoded.c_str(), NEWS_MAX_TEXT_LEN);
+      strlcpy(app.news.items[parsedCount], decoded.c_str(), NEWS_MAX_TEXT_LEN);
       parsedCount++;
     }
 
@@ -425,7 +425,7 @@ bool parseNewsItems(const String &payload) {
     return false;
   }
 
-  app.newsItemCount = parsedCount;
+  app.news.itemCount = parsedCount;
   rebuildNewsTicker();
   return true;
 }

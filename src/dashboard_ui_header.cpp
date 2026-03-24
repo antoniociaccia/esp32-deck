@@ -75,21 +75,21 @@ static OtaApplyState lastOtaApplyState = OTA_APPLY_IDLE;
 static int lastOtaApplyProgressPercent = -1;
 
 static const char *otaHeaderSymbol() {
-  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+  if (app.ota.applyState == OTA_APPLY_IN_PROGRESS) {
     return LV_SYMBOL_REFRESH;
   }
-  if (app.otaApplyState == OTA_APPLY_SUCCESS) {
+  if (app.ota.applyState == OTA_APPLY_SUCCESS) {
     return LV_SYMBOL_OK;
   }
-  if (app.otaApplyState == OTA_APPLY_FAILED) {
+  if (app.ota.applyState == OTA_APPLY_FAILED) {
     return LV_SYMBOL_WARNING;
   }
 
-  if (app.otaState != SERVICE_FETCH_READY) {
+  if (app.ota.state != SERVICE_FETCH_READY) {
     return LV_SYMBOL_DOWNLOAD;
   }
 
-  switch (app.otaEligibility) {
+  switch (app.ota.eligibility) {
     case OTA_ELIGIBILITY_UPDATE_AVAILABLE:
       return LV_SYMBOL_DOWNLOAD;
     case OTA_ELIGIBILITY_UP_TO_DATE:
@@ -107,18 +107,18 @@ static const char *otaHeaderSymbol() {
 }
 
 static uint32_t otaHeaderColor() {
-  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+  if (app.ota.applyState == OTA_APPLY_IN_PROGRESS) {
     return UI_COLOR_ACCENT;
   }
-  if (app.otaApplyState == OTA_APPLY_SUCCESS) {
+  if (app.ota.applyState == OTA_APPLY_SUCCESS) {
     return UI_COLOR_WIFI_ONLINE;
   }
-  if (app.otaApplyState == OTA_APPLY_FAILED) {
+  if (app.ota.applyState == OTA_APPLY_FAILED) {
     return UI_COLOR_ACCENT;
   }
 
-  if (app.otaState != SERVICE_FETCH_READY) {
-    switch (app.otaState) {
+  if (app.ota.state != SERVICE_FETCH_READY) {
+    switch (app.ota.state) {
       case SERVICE_FETCH_CONFIG_MISSING:
       case SERVICE_FETCH_HTTP_ERROR:
       case SERVICE_FETCH_INVALID_PAYLOAD:
@@ -131,7 +131,7 @@ static uint32_t otaHeaderColor() {
     }
   }
 
-  switch (app.otaEligibility) {
+  switch (app.ota.eligibility) {
     case OTA_ELIGIBILITY_UPDATE_AVAILABLE:
       return UI_COLOR_ACCENT;
     case OTA_ELIGIBILITY_UP_TO_DATE:
@@ -174,11 +174,11 @@ static void updateWifiUi() {
 }
 
 static const char *compactWeatherHeaderText() {
-  if (app.weatherState == SERVICE_FETCH_READY && app.weatherValid) {
-    return app.weatherLabelText;
+  if (app.weather.state == SERVICE_FETCH_READY && app.weather.valid) {
+    return app.weather.labelText;
   }
 
-  switch (app.weatherState) {
+  switch (app.weather.state) {
     case SERVICE_FETCH_OFFLINE:
       return "meteo off";
     case SERVICE_FETCH_CONFIG_MISSING:
@@ -201,7 +201,7 @@ static void refreshOtaHeaderUi() {
   }
 
   bool otaVisible = DEBUG_OTA_BUTTON_ALWAYS_VISIBLE
-    || (app.otaState == SERVICE_FETCH_READY && app.otaEligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE);
+    || (app.ota.state == SERVICE_FETCH_READY && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE);
   if (otaVisible) {
     lv_obj_clear_flag(ui.otaButton, LV_OBJ_FLAG_HIDDEN);
   } else {
@@ -210,24 +210,24 @@ static void refreshOtaHeaderUi() {
   }
 
   if (otaHeaderInitialized
-    && lastOtaState == app.otaState
-    && lastOtaEligibility == app.otaEligibility
-    && lastOtaHttpCode == app.otaLastHttpCode
-    && lastOtaApplyState == app.otaApplyState
-    && lastOtaApplyProgressPercent == app.otaApplyProgressPercent
-    && strcmp(lastOtaVersion, app.otaRemoteVersion) == 0) {
+    && lastOtaState == app.ota.state
+    && lastOtaEligibility == app.ota.eligibility
+    && lastOtaHttpCode == app.ota.lastHttpCode
+    && lastOtaApplyState == app.ota.applyState
+    && lastOtaApplyProgressPercent == app.ota.applyProgressPercent
+    && strcmp(lastOtaVersion, app.ota.remoteVersion) == 0) {
     refreshOtaPopupUi();
     return;
   }
 
   setDashboardLabelTextIfChanged(ui.otaLabel, otaHeaderSymbol());
   setDashboardLabelColor(ui.otaLabel, otaHeaderColor());
-  lastOtaState = app.otaState;
-  lastOtaEligibility = app.otaEligibility;
-  lastOtaHttpCode = app.otaLastHttpCode;
-  lastOtaApplyState = app.otaApplyState;
-  lastOtaApplyProgressPercent = app.otaApplyProgressPercent;
-  strlcpy(lastOtaVersion, app.otaRemoteVersion, sizeof(lastOtaVersion));
+  lastOtaState = app.ota.state;
+  lastOtaEligibility = app.ota.eligibility;
+  lastOtaHttpCode = app.ota.lastHttpCode;
+  lastOtaApplyState = app.ota.applyState;
+  lastOtaApplyProgressPercent = app.ota.applyProgressPercent;
+  strlcpy(lastOtaVersion, app.ota.remoteVersion, sizeof(lastOtaVersion));
   otaHeaderInitialized = true;
   refreshOtaPopupUi();
 }
@@ -259,7 +259,7 @@ static void refreshClockHeaderUi() {
     return;
   }
 
-  const char *clockText = strlen(app.clockLabelText) > 0 ? app.clockLabelText : "sync orario...";
+  const char *clockText = strlen(app.clock.labelText) > 0 ? app.clock.labelText : "sync orario...";
   if (strcmp(lastClockHeaderText, clockText) == 0) {
     return;
   }
@@ -279,12 +279,12 @@ static void refreshWeatherHeaderUi() {
     strlcpy(lastWeatherHeaderCompactText, weatherText, sizeof(lastWeatherHeaderCompactText));
   }
 
-  if (strcmp(lastWeatherHeaderIconCode, app.weatherIconCode) == 0) {
+  if (strcmp(lastWeatherHeaderIconCode, app.weather.iconCode) == 0) {
     return;
   }
 
-  updateWeatherHeaderIcon(String(app.weatherIconCode));
-  strlcpy(lastWeatherHeaderIconCode, app.weatherIconCode, sizeof(lastWeatherHeaderIconCode));
+  updateWeatherHeaderIcon(String(app.weather.iconCode));
+  strlcpy(lastWeatherHeaderIconCode, app.weather.iconCode, sizeof(lastWeatherHeaderIconCode));
 }
 
 static void refreshBatteryHeaderUi() {
@@ -297,20 +297,20 @@ static void refreshBatteryHeaderUi() {
   const char *iconText = LV_SYMBOL_BATTERY_EMPTY;
   uint32_t textColor = UI_COLOR_TEXT_MUTED;
 
-  if (!app.batteryPresent || app.batteryPercent < 0) {
+  if (!app.battery.present || app.battery.percent < 0) {
     strlcpy(percentBuffer, "--", sizeof(percentBuffer));
     strlcpy(voltageBuffer, "--.--V", sizeof(voltageBuffer));
   } else {
-    snprintf(percentBuffer, sizeof(percentBuffer), "%d%%", app.batteryPercent);
-    snprintf(voltageBuffer, sizeof(voltageBuffer), "%.2fV", app.batteryVoltage);
+    snprintf(percentBuffer, sizeof(percentBuffer), "%d%%", app.battery.percent);
+    snprintf(voltageBuffer, sizeof(voltageBuffer), "%.2fV", app.battery.voltage);
 
-    if (app.batteryPercent >= 85) {
+    if (app.battery.percent >= 85) {
       iconText = LV_SYMBOL_BATTERY_FULL;
-    } else if (app.batteryPercent >= 60) {
+    } else if (app.battery.percent >= 60) {
       iconText = LV_SYMBOL_BATTERY_3;
-    } else if (app.batteryPercent >= 35) {
+    } else if (app.battery.percent >= 35) {
       iconText = LV_SYMBOL_BATTERY_2;
-    } else if (app.batteryPercent >= 15) {
+    } else if (app.battery.percent >= 15) {
       iconText = LV_SYMBOL_BATTERY_1;
     }
 
@@ -318,8 +318,8 @@ static void refreshBatteryHeaderUi() {
   }
 
   if (batteryHeaderInitialized
-    && lastBatteryPresent == app.batteryPresent
-    && lastBatteryPercent == app.batteryPercent
+    && lastBatteryPresent == app.battery.present
+    && lastBatteryPercent == app.battery.percent
     && strcmp(lastBatteryVoltageText, voltageBuffer) == 0) {
     return;
   }
@@ -331,8 +331,8 @@ static void refreshBatteryHeaderUi() {
   setDashboardLabelColor(ui.batteryVoltageLabel, textColor);
   setDashboardLabelColor(ui.batteryIconLabel, textColor);
 
-  lastBatteryPresent = app.batteryPresent;
-  lastBatteryPercent = app.batteryPercent;
+  lastBatteryPresent = app.battery.present;
+  lastBatteryPercent = app.battery.percent;
   strlcpy(lastBatteryVoltageText, voltageBuffer, sizeof(lastBatteryVoltageText));
   batteryHeaderInitialized = true;
 }
