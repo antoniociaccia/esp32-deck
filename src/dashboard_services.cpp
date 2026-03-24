@@ -1,6 +1,7 @@
 #include "dashboard_services.h"
 #include "dashboard_app.h"
-#include "dashboard_ui.h"
+#include "dashboard_support.h"
+#include "config_timing.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -8,24 +9,18 @@
 #include "secrets.h"
 
 void updateClockUi() {
-  if (!intervalElapsed(app.lastClockUpdateMs, CLOCK_REFRESH_INTERVAL_MS)) {
+  if (!intervalElapsed(app.lastClockUpdateMs, TIMING_CLOCK_REFRESH_MS)) {
     return;
   }
 
-  if (ui.timeLabel == nullptr) {
-    return;
-  }
-
-  char timeBuffer[24];
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 10)) {
-    snprintf(timeBuffer, sizeof(timeBuffer), "%02d/%02d %02d:%02d",
+    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "%02d/%02d %02d:%02d",
       timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_hour, timeinfo.tm_min);
     app.timeSynced = true;
   } else {
-    snprintf(timeBuffer, sizeof(timeBuffer), "sync orario...");
+    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "sync orario...");
   }
-  lv_label_set_text(ui.timeLabel, timeBuffer);
 }
 
 static String buildWeatherUrl() {
@@ -39,7 +34,7 @@ static String buildWeatherUrl() {
 }
 
 void updateWeatherUi() {
-  unsigned long refreshInterval = app.weatherValid ? WEATHER_REFRESH_INTERVAL_MS : WEATHER_RETRY_INTERVAL_MS;
+  unsigned long refreshInterval = app.weatherValid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
   if (!intervalElapsed(app.lastWeatherUpdateMs, refreshInterval)) {
     return;
   }
@@ -47,14 +42,16 @@ void updateWeatherUi() {
   if (WiFi.status() != WL_CONNECTED) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
-    setWeatherStatus("meteo offline");
+    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo offline");
+    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
     return;
   }
 
   if (strlen(OPENWEATHER_API_KEY) == 0) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
-    setWeatherStatus("meteo n/d");
+    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo n/d");
+    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
     return;
   }
 
@@ -65,7 +62,8 @@ void updateWeatherUi() {
   if (!http.begin(client, buildWeatherUrl())) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
-    setWeatherStatus("meteo errore");
+    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
+    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
     return;
   }
 
@@ -73,7 +71,8 @@ void updateWeatherUi() {
   if (httpCode != HTTP_CODE_OK) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
-    setWeatherStatus("meteo errore");
+    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
+    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
     http.end();
     return;
   }
@@ -83,16 +82,14 @@ void updateWeatherUi() {
 
   int temperature = extractJsonIntAfterKey(payload, "\"temp\"", 0);
   String iconCode = extractJsonStringAfterKey(payload, "\"icon\"", "");
-  char weatherBuffer[32];
-  snprintf(weatherBuffer, sizeof(weatherBuffer), "%s %dC", WEATHER_CITY_LABEL, temperature);
-  setWeatherStatus(weatherBuffer);
-  updateWeatherIconUi(iconCode);
+  snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
+  strlcpy(app.weatherIconCode, iconCode.c_str(), sizeof(app.weatherIconCode));
   app.weatherValid = true;
   app.weatherTemperatureC = temperature;
 }
 
 void updateNewsFeed() {
-  unsigned long refreshInterval = app.newsValid ? NEWS_REFRESH_INTERVAL_MS : NEWS_RETRY_INTERVAL_MS;
+  unsigned long refreshInterval = app.newsValid ? TIMING_NEWS_REFRESH_MS : TIMING_NEWS_RETRY_MS;
   if (!intervalElapsed(app.lastNewsFetchMs, refreshInterval)) {
     return;
   }
@@ -142,10 +139,7 @@ static void ensureWifiConnection() {
 void beginTimeSync() {
   if (strlen(WIFI_SSID) == 0) {
     Serial.println("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
-    if (ui.timeLabel != nullptr) {
-      lv_label_set_text(ui.timeLabel, "config WiFi");
-    }
-    updateWifiUi();
+    snprintf(app.clockLabelText, sizeof(app.clockLabelText), "config WiFi");
     return;
   }
 
@@ -153,18 +147,15 @@ void beginTimeSync() {
   Serial.println("Connessione WiFi per NTP...");
   configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
   app.lastTimeSyncAttemptMs = millis();
-  updateWifiUi();
 }
 
 void maintainTimeSync() {
-  updateWifiUi();
-
   if (app.timeSynced) {
     return;
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    if (millis() - app.lastTimeSyncAttemptMs > WIFI_RECONNECT_INTERVAL_MS) {
+    if (millis() - app.lastTimeSyncAttemptMs > TIMING_WIFI_RECONNECT_MS) {
       beginTimeSync();
     }
     return;
@@ -178,7 +169,7 @@ void maintainTimeSync() {
     return;
   }
 
-  if (millis() - app.lastTimeSyncAttemptMs > NTP_RETRY_INTERVAL_MS) {
+  if (millis() - app.lastTimeSyncAttemptMs > TIMING_NTP_RETRY_MS) {
     Serial.println("Ritento sync NTP");
     configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
     app.lastTimeSyncAttemptMs = millis();

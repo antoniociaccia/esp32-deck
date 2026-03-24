@@ -1,6 +1,7 @@
 #include "src/display.h"
 #include "src/dashboard_app.h"
 #include "src/dashboard_runtime.h"
+#include "src/config_timing.h"
 
 Display screen;
 
@@ -10,7 +11,7 @@ void setup() {
   Serial.println();
   Serial.println("[boot] serial ready");
 
-  if (SAFE_BOOT_RECOVERY) {
+  if (DASHBOARD_SAFE_BOOT_RECOVERY) {
     enterSafeBootRecovery(screen);
     return;
   }
@@ -19,7 +20,7 @@ void setup() {
 }
 
 void loop() {
-  if (SAFE_BOOT_RECOVERY) {
+  if (DASHBOARD_SAFE_BOOT_RECOVERY) {
     runSafeModeLoop();
     return;
   }

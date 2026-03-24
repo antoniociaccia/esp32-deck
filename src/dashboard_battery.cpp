@@ -1,14 +1,16 @@
 #include "dashboard_battery.h"
 #include "dashboard_app.h"
-#include "dashboard_ui.h"
+#include "dashboard_support.h"
+#include "config_power.h"
+#include "config_timing.h"
 #include <math.h>
 
 static float clampBatteryVoltage(float value) {
-  if (value < BATTERY_EMPTY_VOLTS) {
-    return BATTERY_EMPTY_VOLTS;
+  if (value < POWER_BATTERY_EMPTY_VOLTS) {
+    return POWER_BATTERY_EMPTY_VOLTS;
   }
-  if (value > BATTERY_FULL_VOLTS) {
-    return BATTERY_FULL_VOLTS;
+  if (value > POWER_BATTERY_FULL_VOLTS) {
+    return POWER_BATTERY_FULL_VOLTS;
   }
   return value;
 }
@@ -62,8 +64,8 @@ static BatteryReading readBatteryVoltage() {
   int minMilliVolts = 1000000;
   int maxMilliVolts = 0;
 
-  for (int i = 0; i < BATTERY_SAMPLE_COUNT; ++i) {
-    int milliVolts = analogReadMilliVolts(BAT_PIN);
+  for (int i = 0; i < POWER_BATTERY_SAMPLE_COUNT; ++i) {
+    int milliVolts = analogReadMilliVolts(POWER_BATTERY_ADC_PIN);
     totalMilliVolts += milliVolts;
     if (milliVolts < minMilliVolts) {
       minMilliVolts = milliVolts;
@@ -74,22 +76,22 @@ static BatteryReading readBatteryVoltage() {
     delay(2);
   }
 
-  float averageMilliVolts = totalMilliVolts / (float)BATTERY_SAMPLE_COUNT;
-  float voltage = (averageMilliVolts / 1000.0f) * BATTERY_DIVIDER_RATIO * BATTERY_CALIBRATION_FACTOR;
+  float averageMilliVolts = totalMilliVolts / (float)POWER_BATTERY_SAMPLE_COUNT;
+  float voltage = (averageMilliVolts / 1000.0f) * POWER_BATTERY_DIVIDER_RATIO * POWER_BATTERY_CALIBRATION_FACTOR;
   int spreadMilliVolts = maxMilliVolts - minMilliVolts;
-  bool present = voltage >= BATTERY_PRESENT_MIN_VOLTS &&
-    voltage <= BATTERY_PRESENT_MAX_VOLTS &&
-    spreadMilliVolts <= BATTERY_MAX_STABLE_SPREAD_MV;
+  bool present = voltage >= POWER_BATTERY_PRESENT_MIN_VOLTS &&
+    voltage <= POWER_BATTERY_PRESENT_MAX_VOLTS &&
+    spreadMilliVolts <= POWER_BATTERY_MAX_STABLE_SPREAD_MV;
 
   return {voltage, spreadMilliVolts, present};
 }
 
 void initBatteryMonitoring() {
-  analogSetPinAttenuation(BAT_PIN, ADC_11db);
+  analogSetPinAttenuation(POWER_BATTERY_ADC_PIN, ADC_11db);
 }
 
 void updateBatteryUi() {
-  if (!intervalElapsed(app.lastBatteryUpdateMs, BATTERY_REFRESH_INTERVAL_MS)) {
+  if (!intervalElapsed(app.lastBatteryUpdateMs, TIMING_BATTERY_REFRESH_MS)) {
     return;
   }
 
@@ -100,7 +102,6 @@ void updateBatteryUi() {
     app.batteryPresent = false;
     app.batteryPercent = -1;
     app.batteryVoltage = 0.0f;
-    setBatteryUiUnavailable();
     return;
   }
 
@@ -109,19 +110,18 @@ void updateBatteryUi() {
     app.batteryInitialized = true;
   } else {
     float delta = measuredVoltage - app.filteredBatteryVoltage;
-    if (delta > BATTERY_MAX_STEP_VOLTS) {
-      measuredVoltage = app.filteredBatteryVoltage + BATTERY_MAX_STEP_VOLTS;
-    } else if (delta < -BATTERY_MAX_STEP_VOLTS) {
-      measuredVoltage = app.filteredBatteryVoltage - BATTERY_MAX_STEP_VOLTS;
+    if (delta > POWER_BATTERY_MAX_STEP_VOLTS) {
+      measuredVoltage = app.filteredBatteryVoltage + POWER_BATTERY_MAX_STEP_VOLTS;
+    } else if (delta < -POWER_BATTERY_MAX_STEP_VOLTS) {
+      measuredVoltage = app.filteredBatteryVoltage - POWER_BATTERY_MAX_STEP_VOLTS;
     }
 
-    app.filteredBatteryVoltage = (BATTERY_FILTER_ALPHA * measuredVoltage) +
-      ((1.0f - BATTERY_FILTER_ALPHA) * app.filteredBatteryVoltage);
+    app.filteredBatteryVoltage = (POWER_BATTERY_FILTER_ALPHA * measuredVoltage) +
+      ((1.0f - POWER_BATTERY_FILTER_ALPHA) * app.filteredBatteryVoltage);
   }
 
   int batteryPercent = batteryPercentFromVoltage(app.filteredBatteryVoltage);
   app.batteryPresent = true;
   app.batteryPercent = batteryPercent;
   app.batteryVoltage = app.filteredBatteryVoltage;
-  setBatteryUiValue(app.filteredBatteryVoltage, batteryPercent);
 }

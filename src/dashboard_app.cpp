@@ -1,15 +1,16 @@
 #include "dashboard_app.h"
+#include "dashboard_support.h"
 
 UiRefs ui;
 AppState app;
 
-const char *const DEFAULT_NEWS_ITEMS[DEFAULT_NEWS_ITEM_COUNT] = {
+const char *const DEFAULT_NEWS_ITEMS[NEWS_DEFAULT_ITEM_COUNT] = {
   "IT | Dashboard pronta per dati reali",
   "TECH | Swipe orizzontale tra i widget",
   "WORLD | Prossimo step: news, meteo e batteria"
 };
 
-const ModuleContent MODULES[MODULE_COUNT] = {
+const ModuleContent MODULES[UI_MODULE_COUNT] = {
   {"Clock", "--:--", "attesa sync NTP"},
   {"Power", "--", "attesa batteria"},
   {"Weather", "--", "attesa meteo"},
@@ -123,20 +124,17 @@ void rebuildNewsTicker() {
   app.newsTicker[0] = '\0';
   for (int i = 0; i < app.newsItemCount; ++i) {
     if (i > 0) {
-      strlcat(app.newsTicker, "     •     ", MAX_TICKER_LEN);
+      strlcat(app.newsTicker, "     •     ", NEWS_MAX_TICKER_LEN);
     }
-    strlcat(app.newsTicker, app.newsItems[i], MAX_TICKER_LEN);
+    strlcat(app.newsTicker, app.newsItems[i], NEWS_MAX_TICKER_LEN);
   }
 
-  if (ui.newsLabel != nullptr) {
-    lv_label_set_text(ui.newsLabel, app.newsTicker);
-  }
 }
 
 void setDefaultNewsItems() {
-  app.newsItemCount = DEFAULT_NEWS_ITEM_COUNT;
-  for (int i = 0; i < DEFAULT_NEWS_ITEM_COUNT; ++i) {
-    strlcpy(app.newsItems[i], DEFAULT_NEWS_ITEMS[i], MAX_NEWS_TEXT_LEN);
+  app.newsItemCount = NEWS_DEFAULT_ITEM_COUNT;
+  for (int i = 0; i < NEWS_DEFAULT_ITEM_COUNT; ++i) {
+    strlcpy(app.newsItems[i], DEFAULT_NEWS_ITEMS[i], NEWS_MAX_TEXT_LEN);
   }
   rebuildNewsTicker();
 }
@@ -145,7 +143,7 @@ bool parseNewsItems(const String &payload) {
   int parsedCount = 0;
   int searchFrom = 0;
 
-  while (parsedCount < MAX_NEWS_ITEMS) {
+  while (parsedCount < NEWS_MAX_ITEMS) {
     int textKey = payload.indexOf("\"text\"", searchFrom);
     if (textKey < 0) {
       break;
@@ -179,7 +177,7 @@ bool parseNewsItems(const String &payload) {
     String decoded = decodeJsonString(payload.substring(startQuote + 1, endQuote));
     normalizeNewsText(decoded);
     if (decoded.length() > 0) {
-      strlcpy(app.newsItems[parsedCount], decoded.c_str(), MAX_NEWS_TEXT_LEN);
+      strlcpy(app.newsItems[parsedCount], decoded.c_str(), NEWS_MAX_TEXT_LEN);
       parsedCount++;
     }
 

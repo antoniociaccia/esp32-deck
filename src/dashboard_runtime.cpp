@@ -1,8 +1,10 @@
 #include "dashboard_runtime.h"
 #include "dashboard_app.h"
+#include "dashboard_support.h"
 #include "dashboard_battery.h"
 #include "dashboard_services.h"
 #include "dashboard_ui.h"
+#include "config_timing.h"
 
 void enterSafeBootRecovery(Display &screen) {
   screen.init();
@@ -24,6 +26,9 @@ void initializeDashboard(Display &screen) {
   screen.init();
   Serial.println("[boot] display init ok");
 
+  strlcpy(app.clockLabelText, "sync orario...", sizeof(app.clockLabelText));
+  strlcpy(app.weatherLabelText, "meteo n/d", sizeof(app.weatherLabelText));
+  app.weatherIconCode[0] = '\0';
   setDefaultNewsItems();
   createDashboardUi();
   Serial.println("[boot] ui ok");
@@ -36,7 +41,7 @@ void initializeDashboard(Display &screen) {
 }
 
 void runSafeModeLoop() {
-  if (!intervalElapsed(app.lastSafeHeartbeatMs, SAFE_HEARTBEAT_INTERVAL_MS)) {
+  if (!intervalElapsed(app.lastSafeHeartbeatMs, TIMING_SAFE_HEARTBEAT_MS)) {
     delay(5);
     return;
   }
@@ -52,6 +57,6 @@ void runDashboardLoop(Display &screen) {
   updateBatteryUi();
   updateWeatherUi();
   updateNewsFeed();
-  updateModuleUi();
+  refreshDashboardUi();
   delay(5);
 }
