@@ -6,12 +6,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/flash-common.sh"
 
 FQBN="esp32:esp32:esp32s3"
-BUILD_PATH="/tmp/arduino-news-build"
-BUILD_LOG="/tmp/arduino-news-build.log"
-APP_MAX_BYTES="4063232"
 CDC_ON_BOOT="1"
 BUILD_JOBS="0"
 PORT_WAIT_SECONDS=5
+DEFAULT_PARTITIONS_FILE="$SCRIPT_DIR/partitions.csv"
+OTA_PARTITIONS_FILE="$SCRIPT_DIR/partitions_ota.csv"
+PARTITIONS_FILE="$DEFAULT_PARTITIONS_FILE"
+BUILD_PATH_BASE="/tmp/arduino-news-build"
+BUILD_PATH="$BUILD_PATH_BASE"
+BUILD_LOG="${BUILD_PATH_BASE}.log"
+APP_MAX_BYTES=""
+SKETCH_PATH="$SCRIPT_DIR"
+TEMP_SKETCH_DIR=""
 
 CLEAN_BUILD=0
 UPLOAD_ONLY=0
@@ -21,15 +27,88 @@ PORT_OVERRIDE=""
 usage() {
   cat <<'EOF'
 Uso:
-  ./flash.sh [--clean] [--build-only] [--upload-only] [--port /dev/...] [--jobs N]
+  ./flash.sh [--clean] [--build-only] [--upload-only] [--ota-layout] [--partitions-file file.csv] [--port /dev/...] [--jobs N]
 
 Opzioni:
   --clean         pulisce la cache di build prima della compilazione
   --build-only    compila senza fare upload
   --upload-only   salta la compilazione e riusa gli artefatti gia presenti
+  --ota-layout    usa il layout OTA in partitions_ota.csv
+  --partitions-file PATH
+                  usa un file partizioni alternativo per compile e upload
   --port PATH     forza la porta seriale
   --jobs N        numero job paralleli per arduino-cli compile (0 = tutti i core)
 EOF
+}
+
+resolve_app_max_bytes() {
+  local partitions_file="$1"
+  local name type subtype offset size flags size_token
+
+  while IFS=, read -r name type subtype offset size flags; do
+    type="${type//[[:space:]]/}"
+    if [[ "$type" != "app" ]]; then
+      continue
+    fi
+
+    size_token="${size//[[:space:]]/}"
+    if [[ -n "$size_token" ]]; then
+      echo $((size_token))
+      return 0
+    fi
+  done < "$partitions_file"
+
+  echo "Impossibile determinare la dimensione app da: $partitions_file" >&2
+  exit 1
+}
+
+refresh_build_paths() {
+  local suffix=""
+
+  if [[ "$PARTITIONS_FILE" != "$DEFAULT_PARTITIONS_FILE" ]]; then
+    suffix="-$(basename "$PARTITIONS_FILE" .csv)"
+  fi
+
+  BUILD_PATH="${BUILD_PATH_BASE}${suffix}"
+  BUILD_LOG="${BUILD_PATH}.log"
+}
+
+cleanup_transient_state() {
+  if [[ -n "$TEMP_SKETCH_DIR" && -d "$TEMP_SKETCH_DIR" ]]; then
+    rm -rf "$(dirname "$TEMP_SKETCH_DIR")"
+    TEMP_SKETCH_DIR=""
+  fi
+}
+
+prepare_sketch_path() {
+  if [[ "$PARTITIONS_FILE" == "$DEFAULT_PARTITIONS_FILE" ]]; then
+    SKETCH_PATH="$SCRIPT_DIR"
+    return 0
+  fi
+
+  if [[ ! -f "$PARTITIONS_FILE" ]]; then
+    echo "File partizioni non trovato: $PARTITIONS_FILE"
+    exit 1
+  fi
+
+  local temp_parent
+  temp_parent="$(mktemp -d "${TMPDIR:-/tmp}/arduino-news-sketch.XXXXXX")"
+  TEMP_SKETCH_DIR="$temp_parent/news"
+  mkdir -p "$TEMP_SKETCH_DIR"
+  shopt -s nullglob
+  for entry in "$SCRIPT_DIR"/*; do
+    local base
+    base="$(basename "$entry")"
+    if [[ "$base" == "$(basename "$TEMP_SKETCH_DIR")" || "$base" == "partitions.csv" ]]; then
+      continue
+    fi
+    cp -R "$entry" "$TEMP_SKETCH_DIR/$base"
+  done
+  shopt -u nullglob
+
+  cp "$PARTITIONS_FILE" "$TEMP_SKETCH_DIR/partitions.csv"
+  trap cleanup_transient_state EXIT
+  SKETCH_PATH="$TEMP_SKETCH_DIR"
 }
 
 render_bar() {
@@ -99,7 +178,7 @@ compile_sketch() {
     --jobs "$BUILD_JOBS" \
     --build-property "upload.maximum_size=$APP_MAX_BYTES" \
     --build-property "build.cdc_on_boot=$CDC_ON_BOOT" \
-    . | tee "$BUILD_LOG"
+    "$SKETCH_PATH" | tee "$BUILD_LOG"
 
   parse_size_summary
 }
@@ -177,6 +256,20 @@ while (( $# > 0 )); do
     --build-only)
       BUILD_ONLY=1
       ;;
+    --ota-layout)
+      PARTITIONS_FILE="$OTA_PARTITIONS_FILE"
+      ;;
+    --partitions-file)
+      shift
+      PARTITIONS_FILE="${1:-}"
+      if [[ -z "$PARTITIONS_FILE" ]]; then
+        echo "Valore mancante per --partitions-file"
+        exit 1
+      fi
+      if [[ "$PARTITIONS_FILE" != /* ]]; then
+        PARTITIONS_FILE="$SCRIPT_DIR/$PARTITIONS_FILE"
+      fi
+      ;;
     --port)
       shift
       PORT_OVERRIDE="${1:-}"
@@ -206,6 +299,15 @@ while (( $# > 0 )); do
   shift
 done
 
+if [[ ! -f "$PARTITIONS_FILE" ]]; then
+  echo "File partizioni non trovato: $PARTITIONS_FILE"
+  exit 1
+fi
+
+refresh_build_paths
+APP_MAX_BYTES="$(resolve_app_max_bytes "$PARTITIONS_FILE")"
+prepare_sketch_path
+
 if [[ "$UPLOAD_ONLY" -eq 1 && "$BUILD_ONLY" -eq 1 ]]; then
   echo "Non puoi usare insieme --upload-only e --build-only"
   exit 1
@@ -226,6 +328,6 @@ PORT="$(resolve_port)"
 ensure_port_available "$PORT"
 
 echo "Carico sulla scheda $PORT..."
-arduino-cli upload -p "$PORT" --fqbn "$FQBN" --build-path "$BUILD_PATH" .
+arduino-cli upload -p "$PORT" --fqbn "$FQBN" --build-path "$BUILD_PATH" "$SKETCH_PATH"
 
 echo "Upload completato."

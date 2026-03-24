@@ -31,6 +31,9 @@ Each pull request should include:
 
 ## Notes on CI
 
-The repository currently runs only lightweight repository checks in GitHub Actions.
+The repository now stores the display setup in [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h).
 
-A full firmware compile workflow is intentionally deferred until the `TFT_eSPI` board-specific setup is fully captured inside the repository, instead of depending on a local Arduino environment.
+- lightweight repository checks run on pushes and pull requests
+- OTA release assets are built on version tags through [.github/workflows/release-ota.yml](.github/workflows/release-ota.yml)
+
+If you change display pins, driver type, or SPI frequency, update the repository-owned TFT setup as part of the same change.

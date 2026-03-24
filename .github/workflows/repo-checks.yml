@@ -36,6 +36,8 @@ jobs:
           bash -n flash.sh
           bash -n flash-monitor.sh
           bash -n flash-common.sh
+          bash -n scripts/apply-tftespi-setup.sh
+          bash -n scripts/build-ota-release.sh
           bash -n tests/run-parser-tests.sh
 
       - name: Run parser tests

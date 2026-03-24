@@ -18,6 +18,7 @@ c++ \
   -I"$REPO_DIR" \
   "$REPO_DIR/tests/parser_tests.cpp" \
   "$REPO_DIR/src/dashboard_app.cpp" \
+  "$REPO_DIR/src/dashboard_ota.cpp" \
   -o "$BIN_PATH"
 
 "$BIN_PATH"

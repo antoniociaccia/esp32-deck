@@ -81,6 +81,14 @@ public:
     }
   }
 
+  float toFloat() const {
+    try {
+      return std::stof(value_);
+    } catch (...) {
+      return 0.0f;
+    }
+  }
+
   void replace(const char *from, const char *to) {
     std::string needle = from == nullptr ? "" : from;
     std::string replacement = to == nullptr ? "" : to;

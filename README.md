@@ -29,6 +29,10 @@ Main libraries:
 
 - [news.ino](news.ino): Arduino entrypoint
 - [src/](src): application code split by runtime, UI, services, battery, display
+- [src/version.h](src/version.h): current firmware version, channel, board id
+- [src/dashboard_ota.h](src/dashboard_ota.h): OTA manifest contract and version comparison helpers
+- [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h): repository-owned display setup for CI and releases
+- [scripts/build-ota-release.sh](scripts/build-ota-release.sh): OTA release build helper
 - [assets/weather-icons/](assets/weather-icons): source weather icons
 - [flash.sh](flash.sh): compile and upload helper
 - [flash-monitor.sh](flash-monitor.sh): upload and serial monitor helper
@@ -47,6 +51,11 @@ Main libraries:
    - `WEATHER_LONGITUDE`
    - `NEWS_API_URL`
    - `NEWS_API_KEY`
+   - `OTA_MANIFEST_URL`
+
+Suggested OTA manifest URL when using GitHub Releases in this repository:
+
+- `https://github.com/antoniociaccia/esp32-deck/releases/latest/download/manifest-stable.json`
 
 `secrets.h` is ignored by Git.
 
@@ -62,6 +71,7 @@ Useful commands:
 - `./flash.sh --clean`
 - `./flash.sh --build-only`
 - `./flash.sh --upload-only`
+- `./flash.sh --ota-layout --build-only`
 - `./flash.sh --port /dev/cu.usbmodem14301`
 - `./flash-monitor.sh`
 
@@ -69,6 +79,7 @@ Notes:
 
 - build output is cached for incremental builds
 - upload can be separated from compile
+- `--ota-layout` compiles against [partitions_ota.csv](partitions_ota.csv) without replacing the default layout
 - the scripts detect a busy serial port and show the owning process
 - the scripts force `build.cdc_on_boot=1` for ESP32-S3 USB serial at runtime
 
@@ -96,15 +107,33 @@ Available modes:
 
 ## Display setup note
 
-This project depends on a board-specific `TFT_eSPI` configuration.
+The board-specific `TFT_eSPI` setup used by this project is now stored in the repository at [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h).
 
-At the moment that setup lives in the local Arduino environment, not inside this repository. That is why the GitHub Actions workflow only performs repository checks and does not yet compile the firmware in CI.
+For local environments you can apply it with:
+
+- `bash ./scripts/apply-tftespi-setup.sh`
 
 ## Flash layout
 
 The current [partitions.csv](partitions.csv) uses a single large app slot on a `4MB` flash configuration.
 
 That keeps more space for the firmware today, but it is not yet an OTA-ready dual-slot layout.
+
+A candidate OTA layout is available in [partitions_ota.csv](partitions_ota.csv), with two `0x1E0000` OTA slots and `otadata`.
+
+## OTA
+
+The repository now includes the OTA groundwork and the first end-to-end GitHub release flow:
+
+- [src/version.h](src/version.h) exposes the current firmware version metadata
+- [src/dashboard_ota.h](src/dashboard_ota.h) and `dashboard_ota.cpp` define the manifest contract
+- the OTA helpers now distinguish `invalid`, `board`, `channel`, `up-to-date`, `slot`, `battery-low` and `available`
+- `updateOtaManifestCheck()` now performs a read-only HTTPS manifest check against `OTA_MANIFEST_URL`
+- the popup in the header can now start the OTA apply flow on device
+- `./flash.sh --ota-layout --build-only` verifies that the current firmware fits the OTA slot budget
+- [.github/workflows/release-ota.yml](.github/workflows/release-ota.yml) builds OTA release assets on Git tags and publishes:
+  - a versioned firmware binary such as `esp32-deck-esp32s3-v0.1.0.bin`
+  - a stable manifest asset `manifest-stable.json`
 
 ## External APIs
 

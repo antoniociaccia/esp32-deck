@@ -15,5 +15,6 @@ static constexpr float WEATHER_LONGITUDE = 0.0f;
 
 static const char *NEWS_API_URL = "https://your-n8n-domain/webhook/desk-news";
 static const char *NEWS_API_KEY = "YOUR_NEWS_API_KEY";
+static const char *OTA_MANIFEST_URL = "https://github.com/your-user/your-repo/releases/latest/download/manifest-stable.json";
 
 #endif

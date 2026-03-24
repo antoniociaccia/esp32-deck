@@ -2,6 +2,7 @@
 
 # Arduino IDE / CLI local files
 build/
+.build/
 *.tmp
 *.bak
 *.swp

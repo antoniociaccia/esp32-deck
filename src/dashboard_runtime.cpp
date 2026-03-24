@@ -49,6 +49,15 @@ void initializeDashboard(Display &screen) {
   app.weatherLastHttpCode = 0;
   app.newsState = SERVICE_FETCH_IDLE;
   app.newsLastHttpCode = 0;
+  app.otaState = SERVICE_FETCH_IDLE;
+  app.otaLastHttpCode = 0;
+  app.otaEligibility = OTA_ELIGIBILITY_INVALID;
+  app.otaRemoteBinUrl[0] = '\0';
+  app.otaApplyRequested = false;
+  app.otaApplyState = OTA_APPLY_IDLE;
+  app.otaApplyProgressPercent = -1;
+  app.otaApplyLastErrorCode = 0;
+  app.otaApplyStatusText[0] = '\0';
   setDefaultNewsItems();
   createDashboardUi();
   DEBUG_BOOT_PRINT("[boot] ui ok");
@@ -78,6 +87,10 @@ void runDashboardLoop(Display &screen) {
   updateBatteryUi();
   updateWeatherUi();
   updateNewsFeed();
+  if (app.otaApplyRequested) {
+    startOtaFirmwareUpdate();
+  }
+  updateOtaManifestCheck();
   refreshDashboardUi();
   delay(5);
 }

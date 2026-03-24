@@ -5,6 +5,7 @@
 #include "lvgl.h"
 #include "config_ui.h"
 #include "config_network.h"
+#include "dashboard_ota.h"
 
 struct ModuleContent {
   const char *title;
@@ -28,6 +29,13 @@ enum ServiceFetchState : uint8_t {
   SERVICE_FETCH_INVALID_PAYLOAD
 };
 
+enum OtaApplyState : uint8_t {
+  OTA_APPLY_IDLE = 0,
+  OTA_APPLY_IN_PROGRESS,
+  OTA_APPLY_SUCCESS,
+  OTA_APPLY_FAILED
+};
+
 static constexpr uint32_t UI_DIRTY_NONE = 0;
 static constexpr uint32_t UI_DIRTY_HEADER = 1UL << 0;
 static constexpr uint32_t UI_DIRTY_FOOTER = 1UL << 1;
@@ -49,6 +57,9 @@ struct UiRefs {
   lv_obj_t *weatherIcon = nullptr;
   lv_obj_t *weatherLabel = nullptr;
   lv_obj_t *wifiLabel = nullptr;
+  lv_obj_t *headerTouchOverlay = nullptr;
+  lv_obj_t *otaButton = nullptr;
+  lv_obj_t *otaLabel = nullptr;
   lv_obj_t *batteryPercentLabel = nullptr;
   lv_obj_t *batteryVoltageLabel = nullptr;
   lv_obj_t *batteryIconLabel = nullptr;
@@ -62,6 +73,10 @@ struct UiRefs {
   lv_obj_t *moduleBadgeLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleValueLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleMetaLabels[UI_MODULE_COUNT] = {nullptr};
+  lv_obj_t *otaPopupOverlay = nullptr;
+  lv_obj_t *otaPopupBodyLabel = nullptr;
+  lv_obj_t *otaPopupActionButton = nullptr;
+  lv_obj_t *otaPopupActionLabel = nullptr;
 };
 
 struct AppState {
@@ -70,6 +85,7 @@ struct AppState {
   unsigned long lastBatteryUpdateMs = 0;
   unsigned long lastWeatherUpdateMs = 0;
   unsigned long lastNewsFetchMs = 0;
+  unsigned long lastOtaCheckMs = 0;
   unsigned long lastSafeHeartbeatMs = 0;
   int currentModuleIndex = 0;
   bool timeSynced = false;
@@ -91,6 +107,20 @@ struct AppState {
   int newsItemCount = 0;
   char newsItems[NEWS_MAX_ITEMS][NEWS_MAX_TEXT_LEN] = {};
   char newsTicker[NEWS_MAX_TICKER_LEN] = {};
+  bool otaManifestValid = false;
+  ServiceFetchState otaState = SERVICE_FETCH_IDLE;
+  int otaLastHttpCode = 0;
+  OtaEligibility otaEligibility = OTA_ELIGIBILITY_INVALID;
+  uint32_t otaRemoteSizeBytes = 0;
+  int otaMinBatteryPercent = 0;
+  char otaRemoteVersion[OTA_VERSION_MAX_LEN] = {};
+  char otaRemoteBuild[OTA_BUILD_MAX_LEN] = {};
+  char otaRemoteBinUrl[OTA_BIN_URL_MAX_LEN] = {};
+  bool otaApplyRequested = false;
+  OtaApplyState otaApplyState = OTA_APPLY_IDLE;
+  int otaApplyProgressPercent = -1;
+  int otaApplyLastErrorCode = 0;
+  char otaApplyStatusText[96] = {};
   uint32_t uiDirtyMask = UI_DIRTY_ALL;
 };
 

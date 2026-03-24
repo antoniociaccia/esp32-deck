@@ -85,7 +85,7 @@ static bool findJsonStringEnd(const String &payload, int startQuote, int searchE
   return false;
 }
 
-static bool extractJsonIntAfterKey(const String &payload, const char *key, int &valueOut, int searchStart = 0, int searchEnd = -1) {
+static bool extractJsonFloatAfterKey(const String &payload, const char *key, float &valueOut, int searchStart = 0, int searchEnd = -1) {
   int boundedEnd = clampJsonSearchEnd(payload, searchEnd);
   int keyIndex = findJsonKeyIndex(payload, key, searchStart, boundedEnd);
   if (keyIndex < 0) {
@@ -99,15 +99,33 @@ static bool extractJsonIntAfterKey(const String &payload, const char *key, int &
 
   int start = skipJsonWhitespace(payload, colonIndex + 1, boundedEnd);
   int end = start;
-  while (end < boundedEnd && (isDigit(payload[end]) || payload[end] == '-')) {
+
+  if (end < boundedEnd && payload[end] == '-') {
     end++;
   }
 
-  if (end <= start) {
+  bool foundDigit = false;
+  bool foundDot = false;
+  while (end < boundedEnd) {
+    char c = payload[end];
+    if (isDigit(c)) {
+      foundDigit = true;
+      end++;
+      continue;
+    }
+    if (c == '.' && !foundDot) {
+      foundDot = true;
+      end++;
+      continue;
+    }
+    break;
+  }
+
+  if (!foundDigit || end <= start) {
     return false;
   }
 
-  valueOut = payload.substring(start, end).toInt();
+  valueOut = payload.substring(start, end).toFloat();
   return true;
 }
 
@@ -333,19 +351,22 @@ bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconC
   int mainEnd = 0;
   int weatherStart = 0;
   int weatherEnd = 0;
-  int parsedTemperature = 0;
+  float parsedTemperature = 0.0f;
   String parsedIconCode;
 
-  if (!findJsonRangeAfterKey(payload, "\"main\"", '{', '}', mainStart, mainEnd)) {
+  if (findJsonRangeAfterKey(payload, "\"main\"", '{', '}', mainStart, mainEnd)) {
+    if (!extractJsonFloatAfterKey(payload, "\"temp\"", parsedTemperature, mainStart, mainEnd)) {
+      return false;
+    }
+  } else if (!extractJsonFloatAfterKey(payload, "\"temp\"", parsedTemperature)) {
     return false;
   }
-  if (!extractJsonIntAfterKey(payload, "\"temp\"", parsedTemperature, mainStart, mainEnd)) {
-    return false;
-  }
-  if (!findJsonRangeAfterKey(payload, "\"weather\"", '[', ']', weatherStart, weatherEnd)) {
-    return false;
-  }
-  if (!extractJsonStringAfterKey(payload, "\"icon\"", parsedIconCode, weatherStart, weatherEnd)) {
+
+  if (findJsonRangeAfterKey(payload, "\"weather\"", '[', ']', weatherStart, weatherEnd)) {
+    if (!extractJsonStringAfterKey(payload, "\"icon\"", parsedIconCode, weatherStart, weatherEnd)) {
+      return false;
+    }
+  } else if (!extractJsonStringAfterKey(payload, "\"icon\"", parsedIconCode)) {
     return false;
   }
 
@@ -354,7 +375,7 @@ bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconC
     return false;
   }
 
-  temperatureOut = parsedTemperature;
+  temperatureOut = static_cast<int>(parsedTemperature >= 0.0f ? parsedTemperature + 0.5f : parsedTemperature - 0.5f);
   strlcpy(iconCodeOut, parsedIconCode.c_str(), iconCodeOutSize);
   return true;
 }
