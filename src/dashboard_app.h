@@ -18,6 +18,22 @@ struct BatteryReading {
   bool present;
 };
 
+static constexpr uint32_t UI_DIRTY_NONE = 0;
+static constexpr uint32_t UI_DIRTY_HEADER = 1UL << 0;
+static constexpr uint32_t UI_DIRTY_FOOTER = 1UL << 1;
+static constexpr uint32_t UI_DIRTY_MAIN_CLOCK = 1UL << 2;
+static constexpr uint32_t UI_DIRTY_MAIN_POWER = 1UL << 3;
+static constexpr uint32_t UI_DIRTY_MAIN_WEATHER = 1UL << 4;
+static constexpr uint32_t UI_DIRTY_MAIN_NEWS = 1UL << 5;
+static constexpr uint32_t UI_DIRTY_MAIN_TILE_STATE = 1UL << 6;
+static constexpr uint32_t UI_DIRTY_MAIN_ALL =
+  UI_DIRTY_MAIN_CLOCK |
+  UI_DIRTY_MAIN_POWER |
+  UI_DIRTY_MAIN_WEATHER |
+  UI_DIRTY_MAIN_NEWS |
+  UI_DIRTY_MAIN_TILE_STATE;
+static constexpr uint32_t UI_DIRTY_ALL = UI_DIRTY_HEADER | UI_DIRTY_FOOTER | UI_DIRTY_MAIN_ALL;
+
 struct UiRefs {
   lv_obj_t *timeLabel = nullptr;
   lv_obj_t *weatherIcon = nullptr;
@@ -61,9 +77,20 @@ struct AppState {
   int newsItemCount = 0;
   char newsItems[NEWS_MAX_ITEMS][NEWS_MAX_TEXT_LEN] = {};
   char newsTicker[NEWS_MAX_TICKER_LEN] = {};
+  uint32_t uiDirtyMask = UI_DIRTY_ALL;
 };
 
 extern UiRefs ui;
 extern AppState app;
+
+inline void markUiDirty(uint32_t mask) {
+  app.uiDirtyMask |= mask;
+}
+
+inline uint32_t consumeUiDirtyMask() {
+  uint32_t mask = app.uiDirtyMask;
+  app.uiDirtyMask = UI_DIRTY_NONE;
+  return mask;
+}
 
 #endif

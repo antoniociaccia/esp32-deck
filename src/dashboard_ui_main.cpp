@@ -1,5 +1,6 @@
 #include "dashboard_ui_main.h"
 #include "dashboard_app.h"
+#include "dashboard_ui.h"
 #include "dashboard_support.h"
 #include "dashboard_ui_shared.h"
 #include <WiFi.h>
@@ -499,7 +500,8 @@ static void tileviewEventCb(lv_event_t *e) {
   for (int i = 0; i < UI_MODULE_COUNT; ++i) {
     if (ui.moduleTiles[i] == activeTile) {
       app.currentModuleIndex = i;
-      refreshDashboardMainUi();
+      markUiDirty(UI_DIRTY_MAIN_TILE_STATE);
+      refreshDashboardUi();
       break;
     }
   }
@@ -545,11 +547,21 @@ void createDashboardMain(lv_obj_t *parent) {
   createDashboardSpacer(parent, 5);
 }
 
-void refreshDashboardMainUi() {
-  updateClockModuleCard();
-  updatePowerModuleCard();
-  updateWeatherModuleCard();
-  updateNewsModuleCard();
-  updateModuleTileStates();
-  updateModuleDots();
+void refreshDashboardMainUi(uint32_t dirtyMask) {
+  if ((dirtyMask & UI_DIRTY_MAIN_CLOCK) != 0) {
+    updateClockModuleCard();
+  }
+  if ((dirtyMask & UI_DIRTY_MAIN_POWER) != 0) {
+    updatePowerModuleCard();
+  }
+  if ((dirtyMask & UI_DIRTY_MAIN_WEATHER) != 0) {
+    updateWeatherModuleCard();
+  }
+  if ((dirtyMask & UI_DIRTY_MAIN_NEWS) != 0) {
+    updateNewsModuleCard();
+  }
+  if ((dirtyMask & UI_DIRTY_MAIN_TILE_STATE) != 0) {
+    updateModuleTileStates();
+    updateModuleDots();
+  }
 }

@@ -95,6 +95,9 @@ void updateBatteryUi() {
     return;
   }
 
+  bool previousBatteryPresent = app.batteryPresent;
+  int previousBatteryPercent = app.batteryPercent;
+  float previousBatteryVoltage = app.batteryVoltage;
   BatteryReading reading = readBatteryVoltage();
   float measuredVoltage = reading.voltage;
 
@@ -102,6 +105,11 @@ void updateBatteryUi() {
     app.batteryPresent = false;
     app.batteryPercent = -1;
     app.batteryVoltage = 0.0f;
+    if (previousBatteryPresent != app.batteryPresent
+      || previousBatteryPercent != app.batteryPercent
+      || previousBatteryVoltage != app.batteryVoltage) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
+    }
     return;
   }
 
@@ -124,4 +132,10 @@ void updateBatteryUi() {
   app.batteryPresent = true;
   app.batteryPercent = batteryPercent;
   app.batteryVoltage = app.filteredBatteryVoltage;
+
+  if (previousBatteryPresent != app.batteryPresent
+    || previousBatteryPercent != app.batteryPercent
+    || previousBatteryVoltage != app.batteryVoltage) {
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
+  }
 }

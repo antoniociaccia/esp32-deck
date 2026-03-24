@@ -13,6 +13,9 @@ void updateClockUi() {
     return;
   }
 
+  char previousClockText[sizeof(app.clockLabelText)];
+  strlcpy(previousClockText, app.clockLabelText, sizeof(previousClockText));
+  bool previousTimeSynced = app.timeSynced;
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 10)) {
     snprintf(app.clockLabelText, sizeof(app.clockLabelText), "%02d/%02d %02d:%02d",
@@ -20,6 +23,10 @@ void updateClockUi() {
     app.timeSynced = true;
   } else {
     snprintf(app.clockLabelText, sizeof(app.clockLabelText), "sync orario...");
+  }
+
+  if (strcmp(previousClockText, app.clockLabelText) != 0 || previousTimeSynced != app.timeSynced) {
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_CLOCK);
   }
 }
 
@@ -39,11 +46,24 @@ void updateWeatherUi() {
     return;
   }
 
+  char previousWeatherText[sizeof(app.weatherLabelText)];
+  char previousWeatherIconCode[sizeof(app.weatherIconCode)];
+  strlcpy(previousWeatherText, app.weatherLabelText, sizeof(previousWeatherText));
+  strlcpy(previousWeatherIconCode, app.weatherIconCode, sizeof(previousWeatherIconCode));
+  bool previousWeatherValid = app.weatherValid;
+  int previousWeatherTemperature = app.weatherTemperatureC;
+
   if (WiFi.status() != WL_CONNECTED) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
     snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo offline");
     strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
+    if (previousWeatherValid != app.weatherValid
+      || previousWeatherTemperature != app.weatherTemperatureC
+      || strcmp(previousWeatherText, app.weatherLabelText) != 0
+      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+    }
     return;
   }
 
@@ -52,6 +72,12 @@ void updateWeatherUi() {
     app.weatherTemperatureC = 0;
     snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo n/d");
     strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
+    if (previousWeatherValid != app.weatherValid
+      || previousWeatherTemperature != app.weatherTemperatureC
+      || strcmp(previousWeatherText, app.weatherLabelText) != 0
+      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+    }
     return;
   }
 
@@ -64,6 +90,12 @@ void updateWeatherUi() {
     app.weatherTemperatureC = 0;
     snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
     strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
+    if (previousWeatherValid != app.weatherValid
+      || previousWeatherTemperature != app.weatherTemperatureC
+      || strcmp(previousWeatherText, app.weatherLabelText) != 0
+      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+    }
     return;
   }
 
@@ -74,6 +106,12 @@ void updateWeatherUi() {
     snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
     strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
     http.end();
+    if (previousWeatherValid != app.weatherValid
+      || previousWeatherTemperature != app.weatherTemperatureC
+      || strcmp(previousWeatherText, app.weatherLabelText) != 0
+      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+    }
     return;
   }
 
@@ -86,6 +124,13 @@ void updateWeatherUi() {
   strlcpy(app.weatherIconCode, iconCode.c_str(), sizeof(app.weatherIconCode));
   app.weatherValid = true;
   app.weatherTemperatureC = temperature;
+
+  if (previousWeatherValid != app.weatherValid
+    || previousWeatherTemperature != app.weatherTemperatureC
+    || strcmp(previousWeatherText, app.weatherLabelText) != 0
+    || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+  }
 }
 
 void updateNewsFeed() {
@@ -94,13 +139,26 @@ void updateNewsFeed() {
     return;
   }
 
+  bool previousNewsValid = app.newsValid;
+  int previousNewsItemCount = app.newsItemCount;
+  char previousNewsTicker[sizeof(app.newsTicker)];
+  char previousFirstNewsItem[NEWS_MAX_TEXT_LEN];
+  strlcpy(previousNewsTicker, app.newsTicker, sizeof(previousNewsTicker));
+  strlcpy(previousFirstNewsItem, app.newsItemCount > 0 ? app.newsItems[0] : "", sizeof(previousFirstNewsItem));
+
   if (WiFi.status() != WL_CONNECTED) {
     app.newsValid = false;
+    if (previousNewsValid != app.newsValid) {
+      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+    }
     return;
   }
 
   if (strlen(NEWS_API_URL) == 0 || strlen(NEWS_API_KEY) == 0) {
     app.newsValid = false;
+    if (previousNewsValid != app.newsValid) {
+      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+    }
     return;
   }
 
@@ -110,6 +168,9 @@ void updateNewsFeed() {
   HTTPClient http;
   if (!http.begin(client, NEWS_API_URL)) {
     app.newsValid = false;
+    if (previousNewsValid != app.newsValid) {
+      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+    }
     return;
   }
 
@@ -118,6 +179,9 @@ void updateNewsFeed() {
   if (httpCode != HTTP_CODE_OK) {
     app.newsValid = false;
     http.end();
+    if (previousNewsValid != app.newsValid) {
+      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+    }
     return;
   }
 
@@ -125,6 +189,12 @@ void updateNewsFeed() {
   http.end();
 
   app.newsValid = parseNewsItems(payload);
+  if (previousNewsValid != app.newsValid
+    || previousNewsItemCount != app.newsItemCount
+    || strcmp(previousNewsTicker, app.newsTicker) != 0
+    || strcmp(previousFirstNewsItem, app.newsItemCount > 0 ? app.newsItems[0] : "") != 0) {
+    markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+  }
 }
 
 static void ensureWifiConnection() {

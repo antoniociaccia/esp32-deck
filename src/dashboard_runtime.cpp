@@ -5,6 +5,21 @@
 #include "dashboard_services.h"
 #include "dashboard_ui.h"
 #include "config_timing.h"
+#include <WiFi.h>
+
+static bool wifiStateInitialized = false;
+static bool lastWifiConnected = false;
+
+static void updateUiDirtyStateFromConnectivity() {
+  bool wifiConnected = WiFi.status() == WL_CONNECTED;
+  if (wifiStateInitialized && lastWifiConnected == wifiConnected) {
+    return;
+  }
+
+  markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_CLOCK | UI_DIRTY_MAIN_WEATHER | UI_DIRTY_MAIN_NEWS);
+  lastWifiConnected = wifiConnected;
+  wifiStateInitialized = true;
+}
 
 void enterSafeBootRecovery(Display &screen) {
   screen.init();
@@ -52,6 +67,7 @@ void runSafeModeLoop() {
 
 void runDashboardLoop(Display &screen) {
   screen.routine();
+  updateUiDirtyStateFromConnectivity();
   maintainTimeSync();
   updateClockUi();
   updateBatteryUi();

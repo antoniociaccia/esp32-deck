@@ -6,6 +6,20 @@
 #include "dashboard_ui_main.h"
 #include "dashboard_ui_footer.h"
 
+static void refreshDashboardUiMask(uint32_t dirtyMask) {
+  if ((dirtyMask & UI_DIRTY_HEADER) != 0) {
+    refreshDashboardHeaderUi();
+  }
+
+  if ((dirtyMask & UI_DIRTY_MAIN_ALL) != 0) {
+    refreshDashboardMainUi(dirtyMask);
+  }
+
+  if ((dirtyMask & UI_DIRTY_FOOTER) != 0) {
+    refreshDashboardFooterUi();
+  }
+}
+
 void createDashboardUi() {
   lv_obj_t *screenRoot = lv_scr_act();
   lv_obj_set_style_bg_color(screenRoot, colorFromHex(UI_COLOR_SCREEN_BG), 0);
@@ -23,11 +37,15 @@ void createDashboardUi() {
   createDashboardSpacer(screenRoot, 6);
   createDashboardMain(screenRoot);
   createDashboardFooter(screenRoot);
+  markUiDirty(UI_DIRTY_ALL);
   refreshDashboardUi();
 }
 
 void refreshDashboardUi() {
-  refreshDashboardHeaderUi();
-  refreshDashboardMainUi();
-  refreshDashboardFooterUi();
+  uint32_t dirtyMask = consumeUiDirtyMask();
+  if (dirtyMask == UI_DIRTY_NONE) {
+    return;
+  }
+
+  refreshDashboardUiMask(dirtyMask);
 }
