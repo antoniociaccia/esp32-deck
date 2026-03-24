@@ -21,3 +21,12 @@ n8n-news-workflow.json
 # Doc
 
 examples/*
+
+docs/OPTIMIZATIONS.md
+docs/OTA_DESIGN.md
+docs/optimizations/ui.md
+docs/optimizations/network.md
+docs/optimizations/power.md
+docs/optimizations/tooling.md
+docs/optimizations/architecture.md
+docs/optimizations/ota.md
