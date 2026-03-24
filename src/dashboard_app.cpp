@@ -11,6 +11,7 @@ const char *const DEFAULT_NEWS_ITEMS[NEWS_DEFAULT_ITEM_COUNT] = {
 };
 
 const ModuleContent MODULES[UI_MODULE_COUNT] = {
+  {"Settings", "Configura", "energia, rete e sistema"},
   {"Clock", "--:--", "attesa sync NTP"},
   {"Power", "--", "attesa batteria"},
   {"Weather", "--", "attesa meteo"},

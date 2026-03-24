@@ -34,6 +34,7 @@ static constexpr uint32_t UI_COLOR_BADGE_OFFLINE_BG = 0xE2E8F0;
 static constexpr uint32_t UI_COLOR_BADGE_ALERT_BG = 0xFAD2CF;
 static constexpr uint32_t UI_COLOR_CARD_ICON_SOFT = 0xB86A2A;
 
-static constexpr int UI_MODULE_COUNT = 4;
+static constexpr int UI_MODULE_COUNT = 5;
+static constexpr int UI_DEFAULT_MODULE_INDEX = 1;
 
 #endif

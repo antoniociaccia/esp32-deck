@@ -42,6 +42,7 @@ void initializeDashboard(Display &screen) {
   screen.init();
   DEBUG_BOOT_PRINT("[boot] display init ok");
 
+  app.currentModuleIndex = UI_DEFAULT_MODULE_INDEX;
   strlcpy(app.clockLabelText, "sync orario...", sizeof(app.clockLabelText));
   strlcpy(app.weatherLabelText, "meteo n/d", sizeof(app.weatherLabelText));
   app.weatherIconCode[0] = '\0';
