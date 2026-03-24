@@ -45,6 +45,10 @@ void initializeDashboard(Display &screen) {
   strlcpy(app.clockLabelText, "sync orario...", sizeof(app.clockLabelText));
   strlcpy(app.weatherLabelText, "meteo n/d", sizeof(app.weatherLabelText));
   app.weatherIconCode[0] = '\0';
+  app.weatherState = SERVICE_FETCH_IDLE;
+  app.weatherLastHttpCode = 0;
+  app.newsState = SERVICE_FETCH_IDLE;
+  app.newsLastHttpCode = 0;
   setDefaultNewsItems();
   createDashboardUi();
   DEBUG_BOOT_PRINT("[boot] ui ok");

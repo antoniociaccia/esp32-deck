@@ -71,6 +71,33 @@ static void setModuleBadge(int index, const char *text, uint32_t bgColorHex, uin
   state.initialized = true;
 }
 
+static void setServiceBadgeFromState(int moduleIndex, ServiceFetchState state) {
+  switch (state) {
+    case SERVICE_FETCH_READY:
+      setModuleBadge(moduleIndex, "live", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_OFFLINE:
+      setModuleBadge(moduleIndex, "offline", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
+      break;
+    case SERVICE_FETCH_CONFIG_MISSING:
+      setModuleBadge(moduleIndex, "config", UI_COLOR_BADGE_ALERT_BG, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+      setModuleBadge(moduleIndex, "rete", UI_COLOR_BADGE_RETRY_BG, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_HTTP_ERROR:
+      setModuleBadge(moduleIndex, "http", UI_COLOR_BADGE_ALERT_BG, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      setModuleBadge(moduleIndex, "json", UI_COLOR_BADGE_ALERT_BG, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_IDLE:
+    default:
+      setModuleBadge(moduleIndex, "init", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
+      break;
+  }
+}
+
 static void setModuleIconLabel(int index, const char *text, uint32_t colorHex) {
   if (index < 0 || index >= UI_MODULE_COUNT || ui.moduleIconRefs[index] == nullptr) {
     return;
@@ -438,18 +465,32 @@ static void updateWeatherModuleCard() {
   char valueBuffer[24];
   char metaBuffer[64];
 
-  if (!app.weatherValid) {
-    strlcpy(valueBuffer, "--", sizeof(valueBuffer));
-    snprintf(metaBuffer, sizeof(metaBuffer), "%s | offline o retry", WEATHER_CITY_LABEL);
-    if (wifiOnline()) {
-      setModuleBadge(2, "retry", UI_COLOR_BADGE_RETRY_BG, UI_COLOR_ACCENT);
-    } else {
-      setModuleBadge(2, "offline", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
-    }
-  } else {
+  if (app.weatherState == SERVICE_FETCH_READY && app.weatherValid) {
     snprintf(valueBuffer, sizeof(valueBuffer), "%dC", app.weatherTemperatureC);
     snprintf(metaBuffer, sizeof(metaBuffer), "%s | feed live", WEATHER_CITY_LABEL);
-    setModuleBadge(2, "live", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
+  } else {
+    strlcpy(valueBuffer, "--", sizeof(valueBuffer));
+    switch (app.weatherState) {
+      case SERVICE_FETCH_OFFLINE:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | Wi-Fi assente", WEATHER_CITY_LABEL);
+        break;
+      case SERVICE_FETCH_CONFIG_MISSING:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | API key assente", WEATHER_CITY_LABEL);
+        break;
+      case SERVICE_FETCH_TRANSPORT_ERROR:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | richiesta fallita", WEATHER_CITY_LABEL);
+        break;
+      case SERVICE_FETCH_HTTP_ERROR:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | HTTP %d", WEATHER_CITY_LABEL, app.weatherLastHttpCode);
+        break;
+      case SERVICE_FETCH_INVALID_PAYLOAD:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | payload non valido", WEATHER_CITY_LABEL);
+        break;
+      case SERVICE_FETCH_IDLE:
+      default:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | attesa primo fetch", WEATHER_CITY_LABEL);
+        break;
+    }
   }
 
   const void *weatherIconSource = weatherCardImageSource();
@@ -459,6 +500,7 @@ static void updateWeatherModuleCard() {
   }
   setDashboardLabelTextIfChanged(ui.moduleValueLabels[2], valueBuffer);
   setDashboardLabelTextIfChanged(ui.moduleMetaLabels[2], metaBuffer);
+  setServiceBadgeFromState(2, app.weatherState);
 }
 
 static void updateNewsModuleCard() {
@@ -469,26 +511,61 @@ static void updateNewsModuleCard() {
   char valueBuffer[24];
   char headlineBuffer[UI_NEWS_PREVIEW_MAX_LEN];
 
-  if (app.newsItemCount > 0) {
+  if (app.newsState == SERVICE_FETCH_READY) {
     snprintf(valueBuffer, sizeof(valueBuffer), "%d news", app.newsItemCount);
+  } else if (app.newsItemCount > 0) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d cached", app.newsItemCount);
   } else {
     strlcpy(valueBuffer, "0 news", sizeof(valueBuffer));
   }
 
-  buildNewsPreview(headlineBuffer, sizeof(headlineBuffer));
+  switch (app.newsState) {
+    case SERVICE_FETCH_READY:
+      buildNewsPreview(headlineBuffer, sizeof(headlineBuffer));
+      break;
+    case SERVICE_FETCH_OFFLINE:
+      strlcpy(headlineBuffer, "Feed fermo: Wi-Fi non connesso", sizeof(headlineBuffer));
+      break;
+    case SERVICE_FETCH_CONFIG_MISSING:
+      strlcpy(headlineBuffer, "Feed fermo: URL o API key mancanti", sizeof(headlineBuffer));
+      break;
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+      strlcpy(headlineBuffer, "Feed fermo: webhook non raggiungibile", sizeof(headlineBuffer));
+      break;
+    case SERVICE_FETCH_HTTP_ERROR:
+      snprintf(headlineBuffer, sizeof(headlineBuffer), "Feed fermo: HTTP %d", app.newsLastHttpCode);
+      break;
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      strlcpy(headlineBuffer, "Feed fermo: payload news non valido", sizeof(headlineBuffer));
+      break;
+    case SERVICE_FETCH_IDLE:
+    default:
+      strlcpy(headlineBuffer, "Feed in attesa del primo aggiornamento", sizeof(headlineBuffer));
+      break;
+  }
+
   setDashboardLabelTextIfChanged(ui.moduleValueLabels[3], valueBuffer);
   setDashboardLabelTextIfChanged(ui.moduleMetaLabels[3], headlineBuffer);
 
-  if (!wifiOnline()) {
-    setModuleBadge(3, "offline", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
-    setModuleIconLabel(3, LV_SYMBOL_WIFI, UI_COLOR_TEXT_MUTED);
-  } else if (app.newsValid) {
-    setModuleBadge(3, "live", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
-    setModuleIconLabel(3, LV_SYMBOL_BELL, UI_COLOR_CARD_ICON_SOFT);
-  } else {
-    setModuleBadge(3, "fallback", UI_COLOR_BADGE_RETRY_BG, UI_COLOR_ACCENT);
-    setModuleIconLabel(3, LV_SYMBOL_WARNING, UI_COLOR_ACCENT);
+  switch (app.newsState) {
+    case SERVICE_FETCH_READY:
+      setModuleIconLabel(3, LV_SYMBOL_BELL, UI_COLOR_CARD_ICON_SOFT);
+      break;
+    case SERVICE_FETCH_OFFLINE:
+      setModuleIconLabel(3, LV_SYMBOL_WIFI, UI_COLOR_TEXT_MUTED);
+      break;
+    case SERVICE_FETCH_CONFIG_MISSING:
+    case SERVICE_FETCH_HTTP_ERROR:
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      setModuleIconLabel(3, LV_SYMBOL_WARNING, UI_COLOR_ACCENT);
+      break;
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+    case SERVICE_FETCH_IDLE:
+    default:
+      setModuleIconLabel(3, LV_SYMBOL_REFRESH, UI_COLOR_CARD_ICON_SOFT);
+      break;
   }
+  setServiceBadgeFromState(3, app.newsState);
 }
 
 static void tileviewEventCb(lv_event_t *e) {

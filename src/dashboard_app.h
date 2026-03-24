@@ -18,6 +18,16 @@ struct BatteryReading {
   bool present;
 };
 
+enum ServiceFetchState : uint8_t {
+  SERVICE_FETCH_IDLE = 0,
+  SERVICE_FETCH_READY,
+  SERVICE_FETCH_OFFLINE,
+  SERVICE_FETCH_CONFIG_MISSING,
+  SERVICE_FETCH_TRANSPORT_ERROR,
+  SERVICE_FETCH_HTTP_ERROR,
+  SERVICE_FETCH_INVALID_PAYLOAD
+};
+
 static constexpr uint32_t UI_DIRTY_NONE = 0;
 static constexpr uint32_t UI_DIRTY_HEADER = 1UL << 0;
 static constexpr uint32_t UI_DIRTY_FOOTER = 1UL << 1;
@@ -69,11 +79,15 @@ struct AppState {
   int batteryPercent = -1;
   float batteryVoltage = 0.0f;
   bool weatherValid = false;
+  ServiceFetchState weatherState = SERVICE_FETCH_IDLE;
+  int weatherLastHttpCode = 0;
   int weatherTemperatureC = 0;
   char clockLabelText[24] = {};
   char weatherLabelText[32] = {};
   char weatherIconCode[8] = {};
   bool newsValid = false;
+  ServiceFetchState newsState = SERVICE_FETCH_IDLE;
+  int newsLastHttpCode = 0;
   int newsItemCount = 0;
   char newsItems[NEWS_MAX_ITEMS][NEWS_MAX_TEXT_LEN] = {};
   char newsTicker[NEWS_MAX_TICKER_LEN] = {};

@@ -9,6 +9,81 @@
 #include <time.h>
 #include "secrets.h"
 
+static bool weatherUiStateChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousTemperature,
+  const char *previousWeatherText,
+  const char *previousWeatherIconCode) {
+  return previousState != app.weatherState
+    || previousHttpCode != app.weatherLastHttpCode
+    || previousValid != app.weatherValid
+    || previousTemperature != app.weatherTemperatureC
+    || strcmp(previousWeatherText, app.weatherLabelText) != 0
+    || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0;
+}
+
+static void markWeatherUiDirtyIfChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousTemperature,
+  const char *previousWeatherText,
+  const char *previousWeatherIconCode) {
+  if (weatherUiStateChanged(
+      previousState,
+      previousHttpCode,
+      previousValid,
+      previousTemperature,
+      previousWeatherText,
+      previousWeatherIconCode)) {
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+  }
+}
+
+static void setWeatherFetchFailure(ServiceFetchState state, const char *labelText, int httpCode = 0) {
+  app.weatherValid = false;
+  app.weatherState = state;
+  app.weatherLastHttpCode = httpCode;
+  app.weatherTemperatureC = 0;
+  strlcpy(app.weatherLabelText, labelText, sizeof(app.weatherLabelText));
+  app.weatherIconCode[0] = '\0';
+}
+
+static bool newsUiStateChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousNewsItemCount,
+  const char *previousNewsTicker,
+  const char *previousFirstNewsItem) {
+  return previousState != app.newsState
+    || previousHttpCode != app.newsLastHttpCode
+    || previousValid != app.newsValid
+    || previousNewsItemCount != app.newsItemCount
+    || strcmp(previousNewsTicker, app.newsTicker) != 0
+    || strcmp(previousFirstNewsItem, app.newsItemCount > 0 ? app.newsItems[0] : "") != 0;
+}
+
+static void markNewsUiDirtyIfChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousNewsItemCount,
+  const char *previousNewsTicker,
+  const char *previousFirstNewsItem) {
+  if (newsUiStateChanged(
+      previousState,
+      previousHttpCode,
+      previousValid,
+      previousNewsItemCount,
+      previousNewsTicker,
+      previousFirstNewsItem)) {
+    markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
+  }
+}
+
 void updateClockUi() {
   if (!intervalElapsed(app.lastClockUpdateMs, TIMING_CLOCK_REFRESH_MS)) {
     return;
@@ -58,33 +133,21 @@ void updateWeatherUi() {
   strlcpy(previousWeatherText, app.weatherLabelText, sizeof(previousWeatherText));
   strlcpy(previousWeatherIconCode, app.weatherIconCode, sizeof(previousWeatherIconCode));
   bool previousWeatherValid = app.weatherValid;
+  ServiceFetchState previousWeatherState = app.weatherState;
+  int previousWeatherHttpCode = app.weatherLastHttpCode;
   int previousWeatherTemperature = app.weatherTemperatureC;
 
   if (WiFi.status() != WL_CONNECTED) {
-    app.weatherValid = false;
-    app.weatherTemperatureC = 0;
-    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo offline");
-    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
-    if (previousWeatherValid != app.weatherValid
-      || previousWeatherTemperature != app.weatherTemperatureC
-      || strcmp(previousWeatherText, app.weatherLabelText) != 0
-      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-    }
+    setWeatherFetchFailure(SERVICE_FETCH_OFFLINE, "meteo offline");
+    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
   }
 
   if (strlen(OPENWEATHER_API_KEY) == 0) {
-    app.weatherValid = false;
-    app.weatherTemperatureC = 0;
-    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo n/d");
-    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
-    if (previousWeatherValid != app.weatherValid
-      || previousWeatherTemperature != app.weatherTemperatureC
-      || strcmp(previousWeatherText, app.weatherLabelText) != 0
-      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-    }
+    setWeatherFetchFailure(SERVICE_FETCH_CONFIG_MISSING, "meteo n/d");
+    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
   }
 
@@ -92,32 +155,18 @@ void updateWeatherUi() {
   HTTPClient http;
   prepareSecureHttpClient(http, client);
   if (!http.begin(client, buildWeatherUrl())) {
-    app.weatherValid = false;
-    app.weatherTemperatureC = 0;
-    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
-    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
-    if (previousWeatherValid != app.weatherValid
-      || previousWeatherTemperature != app.weatherTemperatureC
-      || strcmp(previousWeatherText, app.weatherLabelText) != 0
-      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-    }
+    setWeatherFetchFailure(SERVICE_FETCH_TRANSPORT_ERROR, "meteo rete");
+    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
   }
 
   int httpCode = http.GET();
   if (httpCode != HTTP_CODE_OK) {
-    app.weatherValid = false;
-    app.weatherTemperatureC = 0;
-    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo errore");
-    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
+    setWeatherFetchFailure(SERVICE_FETCH_HTTP_ERROR, "meteo http", httpCode);
     http.end();
-    if (previousWeatherValid != app.weatherValid
-      || previousWeatherTemperature != app.weatherTemperatureC
-      || strcmp(previousWeatherText, app.weatherLabelText) != 0
-      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-    }
+    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
   }
 
@@ -127,30 +176,21 @@ void updateWeatherUi() {
   int temperature = 0;
   char iconCode[sizeof(app.weatherIconCode)] = {};
   if (!parseWeatherPayload(payload, temperature, iconCode, sizeof(iconCode))) {
-    app.weatherValid = false;
-    app.weatherTemperatureC = 0;
-    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo non valido");
-    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
-    if (previousWeatherValid != app.weatherValid
-      || previousWeatherTemperature != app.weatherTemperatureC
-      || strcmp(previousWeatherText, app.weatherLabelText) != 0
-      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-    }
+    setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
+    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
   }
 
   snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
   strlcpy(app.weatherIconCode, iconCode, sizeof(app.weatherIconCode));
   app.weatherValid = true;
+  app.weatherState = SERVICE_FETCH_READY;
+  app.weatherLastHttpCode = httpCode;
   app.weatherTemperatureC = temperature;
 
-  if (previousWeatherValid != app.weatherValid
-    || previousWeatherTemperature != app.weatherTemperatureC
-    || strcmp(previousWeatherText, app.weatherLabelText) != 0
-    || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
-    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-  }
+  markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
 }
 
 void updateNewsFeed() {
@@ -160,6 +200,8 @@ void updateNewsFeed() {
   }
 
   bool previousNewsValid = app.newsValid;
+  ServiceFetchState previousNewsState = app.newsState;
+  int previousNewsHttpCode = app.newsLastHttpCode;
   int previousNewsItemCount = app.newsItemCount;
   char previousNewsTicker[sizeof(app.newsTicker)];
   char previousFirstNewsItem[NEWS_MAX_TEXT_LEN];
@@ -168,17 +210,19 @@ void updateNewsFeed() {
 
   if (WiFi.status() != WL_CONNECTED) {
     app.newsValid = false;
-    if (previousNewsValid != app.newsValid) {
-      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
-    }
+    app.newsState = SERVICE_FETCH_OFFLINE;
+    app.newsLastHttpCode = 0;
+    markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
   }
 
   if (strlen(NEWS_API_URL) == 0 || strlen(NEWS_API_KEY) == 0) {
     app.newsValid = false;
-    if (previousNewsValid != app.newsValid) {
-      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
-    }
+    app.newsState = SERVICE_FETCH_CONFIG_MISSING;
+    app.newsLastHttpCode = 0;
+    markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
   }
 
@@ -187,9 +231,10 @@ void updateNewsFeed() {
   prepareSecureHttpClient(http, client);
   if (!http.begin(client, NEWS_API_URL)) {
     app.newsValid = false;
-    if (previousNewsValid != app.newsValid) {
-      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
-    }
+    app.newsState = SERVICE_FETCH_TRANSPORT_ERROR;
+    app.newsLastHttpCode = 0;
+    markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
   }
 
@@ -197,10 +242,11 @@ void updateNewsFeed() {
   int httpCode = http.GET();
   if (httpCode != HTTP_CODE_OK) {
     app.newsValid = false;
+    app.newsState = SERVICE_FETCH_HTTP_ERROR;
+    app.newsLastHttpCode = httpCode;
     http.end();
-    if (previousNewsValid != app.newsValid) {
-      markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
-    }
+    markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
   }
 
@@ -208,12 +254,10 @@ void updateNewsFeed() {
   http.end();
 
   app.newsValid = parseNewsItems(payload);
-  if (previousNewsValid != app.newsValid
-    || previousNewsItemCount != app.newsItemCount
-    || strcmp(previousNewsTicker, app.newsTicker) != 0
-    || strcmp(previousFirstNewsItem, app.newsItemCount > 0 ? app.newsItems[0] : "") != 0) {
-    markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
-  }
+  app.newsState = app.newsValid ? SERVICE_FETCH_READY : SERVICE_FETCH_INVALID_PAYLOAD;
+  app.newsLastHttpCode = httpCode;
+  markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+    previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
 }
 
 static void ensureWifiConnection() {
