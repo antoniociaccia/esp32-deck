@@ -2,17 +2,35 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="${0:A:h}"
+source "$SCRIPT_DIR/flash-common.sh"
+
 FQBN="esp32:esp32:esp32s3"
 BUILD_PATH="/tmp/arduino-news-build"
 BUILD_LOG="/tmp/arduino-news-build.log"
 APP_MAX_BYTES="4063232"
 CDC_ON_BOOT="1"
-CLEAN_BUILD=0
+BUILD_JOBS="0"
 PORT_WAIT_SECONDS=5
 
-if [[ "${1:-}" == "--clean" ]]; then
-  CLEAN_BUILD=1
-fi
+CLEAN_BUILD=0
+UPLOAD_ONLY=0
+BUILD_ONLY=0
+PORT_OVERRIDE=""
+
+usage() {
+  cat <<'EOF'
+Uso:
+  ./flash.sh [--clean] [--build-only] [--upload-only] [--port /dev/...] [--jobs N]
+
+Opzioni:
+  --clean         pulisce la cache di build prima della compilazione
+  --build-only    compila senza fare upload
+  --upload-only   salta la compilazione e riusa gli artefatti gia presenti
+  --port PATH     forza la porta seriale
+  --jobs N        numero job paralleli per arduino-cli compile (0 = tutti i core)
+EOF
+}
 
 render_bar() {
   local used="$1"
@@ -29,97 +47,181 @@ render_bar() {
   printf "%-5s [%s] %3d%%\n" "$label" "$bar" "$percent"
 }
 
-detect_port() {
-  local port=""
-  local -a ports
+parse_size_summary() {
+  local flash_line ram_line flash_bytes flash_max ram_bytes ram_max
 
-  port=$(arduino-cli board list | awk '/ESP32-S3|esp32s3/ {print $1; exit}')
-  if [[ -n "$port" ]]; then
-    echo "$port"
-    return 0
+  flash_line=$(grep -E "Sketch uses|Lo sketch usa" "$BUILD_LOG" | head -n 1 || true)
+  ram_line=$(grep -E "Global variables use|Le variabili globali usano" "$BUILD_LOG" | head -n 1 || true)
+  flash_bytes=$(echo "$flash_line" | sed -E 's/.*Sketch uses ([0-9]+) bytes.*/\1/')
+  flash_max=$(echo "$flash_line" | sed -E 's/.*Maximum is ([0-9]+) bytes.*/\1/')
+  ram_bytes=$(echo "$ram_line" | sed -E 's/.*Global variables use ([0-9]+) bytes.*/\1/')
+  ram_max=$(echo "$ram_line" | sed -E 's/.*Maximum is ([0-9]+) bytes.*/\1/')
+
+  if [[ "$flash_line" == Lo\ sketch\ usa* ]]; then
+    flash_bytes=$(echo "$flash_line" | sed -E 's/.*usa ([0-9]+) byte.*/\1/')
+    flash_max=$(echo "$flash_line" | sed -E 's/.*massimo è ([0-9]+) byte.*/\1/')
   fi
 
-  ports=(/dev/cu.usbmodem*(N))
-  if (( ${#ports[@]} > 0 )); then
-    echo "$ports[1]"
-    return 0
+  if [[ "$ram_line" == Le\ variabili\ globali\ usano* ]]; then
+    ram_bytes=$(echo "$ram_line" | sed -E 's/.*usano ([0-9]+) byte.*/\1/')
+    ram_max=$(echo "$ram_line" | sed -E 's/.*massimo è ([0-9]+) byte.*/\1/')
   fi
 
-  ports=(/dev/tty.usbmodem*(N))
-  if (( ${#ports[@]} > 0 )); then
-    echo "$ports[1]"
-    return 0
+  echo
+  echo "Riepilogo dimensioni:"
+  [[ -n "$flash_line" ]] && echo "$flash_line"
+  [[ -n "$ram_line" ]] && echo "$ram_line"
+
+  if [[ -n "$flash_line" && -n "$flash_bytes" && -n "$flash_max" ]]; then
+    printf "Flash: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $flash_bytes/1000000}")" "$(awk "BEGIN {print $flash_max/1000000}")"
+    render_bar "$flash_bytes" "$flash_max" "Flash"
   fi
 
-  return 1
+  if [[ -n "$ram_line" && -n "$ram_bytes" && -n "$ram_max" ]]; then
+    printf "RAM: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $ram_bytes/1000000}")" "$(awk "BEGIN {print $ram_max/1000000}")"
+    render_bar "$ram_bytes" "$ram_max" "RAM"
+  fi
 }
 
-echo "Compilo lo sketch..."
-mkdir -p "$BUILD_PATH"
-
-if [[ "$CLEAN_BUILD" -eq 1 ]]; then
-  echo "Pulizia build cache..."
-  rm -rf "$BUILD_PATH"
+compile_sketch() {
+  echo "Compilo lo sketch..."
   mkdir -p "$BUILD_PATH"
-fi
-arduino-cli compile \
-  --fqbn "$FQBN" \
-  --build-path "$BUILD_PATH" \
-  --build-property "upload.maximum_size=$APP_MAX_BYTES" \
-  --build-property "build.cdc_on_boot=$CDC_ON_BOOT" \
-  . | tee "$BUILD_LOG"
 
-FLASH_LINE=$(grep -E "Sketch uses|Lo sketch usa" "$BUILD_LOG" | head -n 1 || true)
-RAM_LINE=$(grep -E "Global variables use|Le variabili globali usano" "$BUILD_LOG" | head -n 1 || true)
-FLASH_BYTES=$(echo "$FLASH_LINE" | sed -E 's/.*Sketch uses ([0-9]+) bytes.*/\1/' )
-FLASH_MAX_BYTES=$(echo "$FLASH_LINE" | sed -E 's/.*Maximum is ([0-9]+) bytes.*/\1/' )
-RAM_BYTES=$(echo "$RAM_LINE" | sed -E 's/.*Global variables use ([0-9]+) bytes.*/\1/' )
-RAM_MAX_BYTES=$(echo "$RAM_LINE" | sed -E 's/.*Maximum is ([0-9]+) bytes.*/\1/' )
+  if [[ "$CLEAN_BUILD" -eq 1 ]]; then
+    echo "Pulizia build cache..."
+    rm -rf "$BUILD_PATH"
+    mkdir -p "$BUILD_PATH"
+  fi
 
-if [[ "$FLASH_LINE" == Lo\ sketch\ usa* ]]; then
-  FLASH_BYTES=$(echo "$FLASH_LINE" | sed -E 's/.*usa ([0-9]+) byte.*/\1/' )
-  FLASH_MAX_BYTES=$(echo "$FLASH_LINE" | sed -E 's/.*massimo è ([0-9]+) byte.*/\1/' )
-fi
+  arduino-cli compile \
+    --fqbn "$FQBN" \
+    --build-path "$BUILD_PATH" \
+    --jobs "$BUILD_JOBS" \
+    --build-property "upload.maximum_size=$APP_MAX_BYTES" \
+    --build-property "build.cdc_on_boot=$CDC_ON_BOOT" \
+    . | tee "$BUILD_LOG"
 
-if [[ "$RAM_LINE" == Le\ variabili\ globali\ usano* ]]; then
-  RAM_BYTES=$(echo "$RAM_LINE" | sed -E 's/.*usano ([0-9]+) byte.*/\1/' )
-  RAM_MAX_BYTES=$(echo "$RAM_LINE" | sed -E 's/.*massimo è ([0-9]+) byte.*/\1/' )
-fi
+  parse_size_summary
+}
 
-echo
-echo "Riepilogo dimensioni:"
-if [ -n "$FLASH_LINE" ]; then
-  echo "$FLASH_LINE"
-fi
-if [ -n "$RAM_LINE" ]; then
-  echo "$RAM_LINE"
-fi
-if [ -n "$FLASH_LINE" ]; then
-  printf "Flash: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $FLASH_BYTES/1000000}")" "$(awk "BEGIN {print $FLASH_MAX_BYTES/1000000}")"
-  render_bar "$FLASH_BYTES" "$FLASH_MAX_BYTES" "Flash"
-fi
-if [ -n "$RAM_LINE" ]; then
-  printf "RAM: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $RAM_BYTES/1000000}")" "$(awk "BEGIN {print $RAM_MAX_BYTES/1000000}")"
-  render_bar "$RAM_BYTES" "$RAM_MAX_BYTES" "RAM"
-fi
+ensure_upload_artifacts() {
+  if [[ ! -d "$BUILD_PATH" ]]; then
+    echo "Build path non trovato: $BUILD_PATH"
+    echo "Esegui prima ./flash.sh oppure rimuovi --upload-only"
+    exit 1
+  fi
 
-PORT="$(detect_port || true)"
-if [[ -z "$PORT" ]]; then
-  echo "Attendo la porta seriale per ${PORT_WAIT_SECONDS}s..."
-  for _ in $(seq 1 "$PORT_WAIT_SECONDS"); do
-    sleep 1
-    PORT="$(detect_port || true)"
-    if [[ -n "$PORT" ]]; then
-      break
+  local -a bins
+  bins=("$BUILD_PATH"/*.bin(N))
+  if (( ${#bins[@]} == 0 )); then
+    echo "Artefatti di build non trovati in $BUILD_PATH"
+    echo "Esegui prima ./flash.sh oppure rimuovi --upload-only"
+    exit 1
+  fi
+}
+
+resolve_port() {
+  local port=""
+
+  if [[ -n "$PORT_OVERRIDE" ]]; then
+    if ! port_exists "$PORT_OVERRIDE"; then
+      echo "Porta seriale non trovata: $PORT_OVERRIDE"
+      exit 1
     fi
-  done
-fi
+    echo "$PORT_OVERRIDE"
+    return 0
+  fi
 
-if [[ -z "$PORT" ]]; then
-  echo "Porta seriale non trovata."
-  echo "Controlla con: arduino-cli board list"
+  echo "Attendo la porta seriale per ${PORT_WAIT_SECONDS}s..." >&2
+  port="$(wait_for_port "" "$PORT_WAIT_SECONDS" || true)"
+  if [[ -z "$port" ]]; then
+    echo "Porta seriale non trovata." >&2
+    echo "Controlla con: arduino-cli board list" >&2
+    exit 1
+  fi
+
+  echo "$port"
+}
+
+ensure_port_available() {
+  local port="$1"
+
+  if ! port_exists "$port"; then
+    echo "Porta seriale assente: $port"
+    echo "Controlla con: arduino-cli board list"
+    exit 1
+  fi
+
+  if check_port_busy "$port"; then
+    echo "Porta seriale occupata: $port"
+    print_port_owner "$port" || true
+    local owner_pid
+    owner_pid="$(port_owner_pid "$port" || true)"
+    if [[ -n "$owner_pid" ]]; then
+      echo "Per liberarla puoi provare: kill $owner_pid"
+    fi
+    exit 1
+  fi
+}
+
+while (( $# > 0 )); do
+  case "$1" in
+    --clean)
+      CLEAN_BUILD=1
+      ;;
+    --upload-only)
+      UPLOAD_ONLY=1
+      ;;
+    --build-only)
+      BUILD_ONLY=1
+      ;;
+    --port)
+      shift
+      PORT_OVERRIDE="${1:-}"
+      if [[ -z "$PORT_OVERRIDE" ]]; then
+        echo "Valore mancante per --port"
+        exit 1
+      fi
+      ;;
+    --jobs)
+      shift
+      BUILD_JOBS="${1:-}"
+      if [[ -z "$BUILD_JOBS" ]]; then
+        echo "Valore mancante per --jobs"
+        exit 1
+      fi
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Opzione non riconosciuta: $1"
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ "$UPLOAD_ONLY" -eq 1 && "$BUILD_ONLY" -eq 1 ]]; then
+  echo "Non puoi usare insieme --upload-only e --build-only"
   exit 1
 fi
+
+if [[ "$UPLOAD_ONLY" -eq 0 ]]; then
+  compile_sketch
+else
+  ensure_upload_artifacts
+fi
+
+if [[ "$BUILD_ONLY" -eq 1 ]]; then
+  echo "Build completata, upload saltato."
+  exit 0
+fi
+
+PORT="$(resolve_port)"
+ensure_port_available "$PORT"
 
 echo "Carico sulla scheda $PORT..."
 arduino-cli upload -p "$PORT" --fqbn "$FQBN" --build-path "$BUILD_PATH" .

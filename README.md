@@ -43,6 +43,7 @@ Struttura:
 - [`weather_icons.h`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.h): dichiarazioni asset meteo
 - [`weather_icons.c`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.c): inclusione asset meteo generati da `LVGL Image Converter`
 - [`partitions.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions.csv): layout flash single-app senza dual OTA
+- [`flash-common.sh`](/Users/antoniociaccia/Documents/Arduino/news/flash-common.sh): helper condivisi per detection porta e controlli seriali
 - [`flash.sh`](/Users/antoniociaccia/Documents/Arduino/news/flash.sh): compile + upload
 - [`flash-monitor.sh`](/Users/antoniociaccia/Documents/Arduino/news/flash-monitor.sh): upload + monitor seriale
 - [`secrets.example.h`](/Users/antoniociaccia/Documents/Arduino/news/secrets.example.h): template credenziali/config
@@ -71,14 +72,26 @@ Board:
 Comandi principali:
 - `./flash.sh`
 - `./flash.sh --clean`
+- `./flash.sh --build-only`
+- `./flash.sh --upload-only`
+- `./flash.sh --port /dev/cu.usbmodem14301`
+- `./flash.sh --jobs 0`
 - `./flash-monitor.sh`
 
 Note su `flash.sh`:
 - usa cache incrementale
+- usa compilazione parallela con `--jobs 0` di default
 - pulisce la build solo con `--clean`
+- permette di separare build e upload con `--build-only` e `--upload-only`
 - mostra barra percentuale per flash e RAM
 - forza `upload.maximum_size` coerente con la partizione app reale
 - forza `build.cdc_on_boot=1` per tenere disponibile la seriale USB runtime su ESP32-S3
+- rileva in anticipo se la porta e assente o occupata e mostra il processo che la sta usando
+
+Per velocizzare il ciclo di sviluppo:
+- usa `./flash.sh --build-only` quando vuoi solo verificare che compili
+- usa `./flash.sh --upload-only` se non hai cambiato codice e vuoi riflashare gli artefatti gia compilati
+- evita `--clean` se non stai cambiando toolchain o librerie
 
 ## Partizioni
 
