@@ -122,6 +122,114 @@ static void prepareSecureHttpClient(HTTPClient &http, WiFiClientSecure &client) 
   http.setReuse(false);
 }
 
+static bool handleWeatherTestMode(
+  ServiceFetchState previousWeatherState,
+  int previousWeatherHttpCode,
+  bool previousWeatherValid,
+  int previousWeatherTemperature,
+  const char *previousWeatherText,
+  const char *previousWeatherIconCode) {
+  switch (DEBUG_WEATHER_TEST_MODE) {
+    case NETWORK_TEST_MODE_DISABLED:
+      return false;
+    case NETWORK_TEST_MODE_OFFLINE:
+      setWeatherFetchFailure(SERVICE_FETCH_OFFLINE, "meteo offline");
+      break;
+    case NETWORK_TEST_MODE_CONFIG_MISSING:
+      setWeatherFetchFailure(SERVICE_FETCH_CONFIG_MISSING, "meteo n/d");
+      break;
+    case NETWORK_TEST_MODE_TRANSPORT_ERROR:
+      setWeatherFetchFailure(SERVICE_FETCH_TRANSPORT_ERROR, "meteo rete");
+      break;
+    case NETWORK_TEST_MODE_HTTP_ERROR:
+      setWeatherFetchFailure(SERVICE_FETCH_HTTP_ERROR, "meteo http", DEBUG_WEATHER_TEST_HTTP_CODE);
+      break;
+    case NETWORK_TEST_MODE_INVALID_PAYLOAD:
+      setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
+      break;
+    case NETWORK_TEST_MODE_SUCCESS_MOCK: {
+      static const String mockPayload = "{\"main\":{\"temp\":21},\"weather\":[{\"icon\":\"01d\"}]}";
+      int temperature = 0;
+      char iconCode[sizeof(app.weatherIconCode)] = {};
+      if (!parseWeatherPayload(mockPayload, temperature, iconCode, sizeof(iconCode))) {
+        setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
+      } else {
+        snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
+        strlcpy(app.weatherIconCode, iconCode, sizeof(app.weatherIconCode));
+        app.weatherValid = true;
+        app.weatherState = SERVICE_FETCH_READY;
+        app.weatherLastHttpCode = HTTP_CODE_OK;
+        app.weatherTemperatureC = temperature;
+      }
+      break;
+    }
+    default:
+      return false;
+  }
+
+  DEBUG_NETWORK_PRINTF("Weather test mode active: %u\n", DEBUG_WEATHER_TEST_MODE);
+  markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+  return true;
+}
+
+static bool handleNewsTestMode(
+  ServiceFetchState previousNewsState,
+  int previousNewsHttpCode,
+  bool previousNewsValid,
+  int previousNewsItemCount,
+  const char *previousNewsTicker,
+  const char *previousFirstNewsItem) {
+  switch (DEBUG_NEWS_TEST_MODE) {
+    case NETWORK_TEST_MODE_DISABLED:
+      return false;
+    case NETWORK_TEST_MODE_OFFLINE:
+      app.newsValid = false;
+      app.newsState = SERVICE_FETCH_OFFLINE;
+      app.newsLastHttpCode = 0;
+      break;
+    case NETWORK_TEST_MODE_CONFIG_MISSING:
+      app.newsValid = false;
+      app.newsState = SERVICE_FETCH_CONFIG_MISSING;
+      app.newsLastHttpCode = 0;
+      break;
+    case NETWORK_TEST_MODE_TRANSPORT_ERROR:
+      app.newsValid = false;
+      app.newsState = SERVICE_FETCH_TRANSPORT_ERROR;
+      app.newsLastHttpCode = 0;
+      break;
+    case NETWORK_TEST_MODE_HTTP_ERROR:
+      app.newsValid = false;
+      app.newsState = SERVICE_FETCH_HTTP_ERROR;
+      app.newsLastHttpCode = DEBUG_NEWS_TEST_HTTP_CODE;
+      break;
+    case NETWORK_TEST_MODE_INVALID_PAYLOAD:
+      app.newsValid = false;
+      app.newsState = SERVICE_FETCH_INVALID_PAYLOAD;
+      app.newsLastHttpCode = HTTP_CODE_OK;
+      break;
+    case NETWORK_TEST_MODE_SUCCESS_MOCK: {
+      static const String mockPayload =
+        "{\"items\":["
+        "{\"text\":\"TEST | Feed locale attivo\"},"
+        "{\"text\":\"TECH | Simulazione news in corso\"},"
+        "{\"text\":\"WORLD | Backend reale non necessario per questa prova\"}"
+        "]}";
+      app.newsValid = parseNewsItems(mockPayload);
+      app.newsState = app.newsValid ? SERVICE_FETCH_READY : SERVICE_FETCH_INVALID_PAYLOAD;
+      app.newsLastHttpCode = HTTP_CODE_OK;
+      break;
+    }
+    default:
+      return false;
+  }
+
+  DEBUG_NETWORK_PRINTF("News test mode active: %u\n", DEBUG_NEWS_TEST_MODE);
+  markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+    previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
+  return true;
+}
+
 void updateWeatherUi() {
   unsigned long refreshInterval = app.weatherValid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
   if (!intervalElapsed(app.lastWeatherUpdateMs, refreshInterval)) {
@@ -136,6 +244,11 @@ void updateWeatherUi() {
   ServiceFetchState previousWeatherState = app.weatherState;
   int previousWeatherHttpCode = app.weatherLastHttpCode;
   int previousWeatherTemperature = app.weatherTemperatureC;
+
+  if (handleWeatherTestMode(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode)) {
+    return;
+  }
 
   if (WiFi.status() != WL_CONNECTED) {
     setWeatherFetchFailure(SERVICE_FETCH_OFFLINE, "meteo offline");
@@ -207,6 +320,11 @@ void updateNewsFeed() {
   char previousFirstNewsItem[NEWS_MAX_TEXT_LEN];
   strlcpy(previousNewsTicker, app.newsTicker, sizeof(previousNewsTicker));
   strlcpy(previousFirstNewsItem, app.newsItemCount > 0 ? app.newsItems[0] : "", sizeof(previousFirstNewsItem));
+
+  if (handleNewsTestMode(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem)) {
+    return;
+  }
 
   if (WiFi.status() != WL_CONNECTED) {
     app.newsValid = false;

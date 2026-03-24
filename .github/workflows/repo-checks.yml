@@ -36,6 +36,10 @@ jobs:
           bash -n flash.sh
           bash -n flash-monitor.sh
           bash -n flash-common.sh
+          bash -n tests/run-parser-tests.sh
+
+      - name: Run parser tests
+        run: bash ./tests/run-parser-tests.sh
 
       - name: Check repository docs for local absolute paths
         run: |

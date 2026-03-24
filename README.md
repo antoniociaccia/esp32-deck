@@ -79,6 +79,21 @@ Serial logging is controlled in [src/config_debug.h](src/config_debug.h).
 Default behavior uses the production profile, with application logs disabled.
 For local debugging, switch `DEBUG_PROFILE` to `DEBUG_PROFILE_DEVELOPMENT`.
 
+For local network-state simulation, use the test constants in [src/config_debug.h](src/config_debug.h):
+
+- `DEBUG_WEATHER_TEST_MODE`
+- `DEBUG_NEWS_TEST_MODE`
+
+Available modes:
+
+- `NETWORK_TEST_MODE_DISABLED`
+- `NETWORK_TEST_MODE_OFFLINE`
+- `NETWORK_TEST_MODE_CONFIG_MISSING`
+- `NETWORK_TEST_MODE_TRANSPORT_ERROR`
+- `NETWORK_TEST_MODE_HTTP_ERROR`
+- `NETWORK_TEST_MODE_INVALID_PAYLOAD`
+- `NETWORK_TEST_MODE_SUCCESS_MOCK`
+
 ## Display setup note
 
 This project depends on a board-specific `TFT_eSPI` configuration.
