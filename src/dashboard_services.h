@@ -5,6 +5,7 @@ void updateClockUi();
 void updateWeatherUi();
 void updateNewsFeed();
 void updateOtaManifestCheck();
+void requestOtaManifestRefresh();
 void startOtaFirmwareUpdate();
 void beginTimeSync();
 void maintainTimeSync();

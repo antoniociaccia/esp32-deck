@@ -364,6 +364,22 @@ void updateOtaManifestCheck() {
     previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
 }
 
+void requestOtaManifestRefresh() {
+  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+    return;
+  }
+
+  app.otaApplyRequested = false;
+  app.otaApplyState = OTA_APPLY_IDLE;
+  app.otaApplyProgressPercent = -1;
+  app.otaApplyLastErrorCode = 0;
+  app.otaApplyStatusText[0] = '\0';
+  app.otaState = SERVICE_FETCH_IDLE;
+  app.otaLastHttpCode = 0;
+  app.lastOtaCheckMs = 0;
+  markUiDirty(UI_DIRTY_HEADER);
+}
+
 void startOtaFirmwareUpdate() {
   if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
     return;

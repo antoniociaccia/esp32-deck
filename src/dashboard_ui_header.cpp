@@ -318,29 +318,46 @@ static void refreshOtaPopupUi() {
     return;
   }
 
-  bool canStartUpdate = app.otaState == SERVICE_FETCH_READY
-    && app.otaEligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE
-    && app.otaApplyState != OTA_APPLY_IN_PROGRESS;
-
-  if (!canStartUpdate) {
+  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS || app.otaApplyState == OTA_APPLY_SUCCESS) {
     lv_obj_add_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_HIDDEN);
     return;
   }
 
   lv_obj_clear_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_HIDDEN);
-  setDashboardLabelTextIfChanged(
-    ui.otaPopupActionLabel,
-    app.otaApplyState == OTA_APPLY_FAILED ? "Riprova" : "Aggiorna");
+
+  if (app.otaState == SERVICE_FETCH_READY && app.otaEligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
+    setDashboardLabelTextIfChanged(
+      ui.otaPopupActionLabel,
+      app.otaApplyState == OTA_APPLY_FAILED ? "Riprova" : "Aggiorna");
+    return;
+  }
+
+  setDashboardLabelTextIfChanged(ui.otaPopupActionLabel, "Controlla");
 }
 
 static void otaPopupActionEventCb(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
-  if (code != LV_EVENT_CLICKED && code != LV_EVENT_SHORT_CLICKED && code != LV_EVENT_RELEASED) {
+  if (code != LV_EVENT_CLICKED && code != LV_EVENT_SHORT_CLICKED) {
+    return;
+  }
+
+  if (app.otaApplyRequested || app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+    return;
+  }
+
+  if (app.otaState != SERVICE_FETCH_READY || app.otaEligibility != OTA_ELIGIBILITY_UPDATE_AVAILABLE) {
+    requestOtaManifestRefresh();
+    refreshOtaPopupUi();
     return;
   }
 
   app.otaApplyRequested = true;
+  app.otaApplyState = OTA_APPLY_IN_PROGRESS;
+  app.otaApplyProgressPercent = 0;
+  app.otaApplyLastErrorCode = 0;
+  strlcpy(app.otaApplyStatusText, "Preparazione OTA...", sizeof(app.otaApplyStatusText));
   markUiDirty(UI_DIRTY_HEADER);
+  refreshOtaPopupUi();
 }
 
 static void showOtaPopup() {
@@ -427,18 +444,16 @@ static void showOtaPopup() {
   lv_obj_set_style_shadow_width(ui.otaPopupActionButton, 0, 0);
   lv_obj_set_style_radius(ui.otaPopupActionButton, 14, 0);
   lv_obj_clear_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(ui.otaPopupActionButton, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(ui.otaPopupActionButton, 10);
   lv_obj_add_event_cb(ui.otaPopupActionButton, otaPopupActionEventCb, LV_EVENT_CLICKED, nullptr);
   lv_obj_add_event_cb(ui.otaPopupActionButton, otaPopupActionEventCb, LV_EVENT_SHORT_CLICKED, nullptr);
-  lv_obj_add_event_cb(ui.otaPopupActionButton, otaPopupActionEventCb, LV_EVENT_RELEASED, nullptr);
 
   ui.otaPopupActionLabel = lv_label_create(ui.otaPopupActionButton);
   lv_label_set_text(ui.otaPopupActionLabel, "Aggiorna");
   setDashboardLabelFont(ui.otaPopupActionLabel, &lv_font_montserrat_12);
   setDashboardLabelColor(ui.otaPopupActionLabel, UI_COLOR_TEXT_LIGHT);
   lv_obj_center(ui.otaPopupActionLabel);
-  lv_obj_add_event_cb(ui.otaPopupActionLabel, otaPopupActionEventCb, LV_EVENT_CLICKED, nullptr);
-  lv_obj_add_event_cb(ui.otaPopupActionLabel, otaPopupActionEventCb, LV_EVENT_SHORT_CLICKED, nullptr);
-  lv_obj_add_event_cb(ui.otaPopupActionLabel, otaPopupActionEventCb, LV_EVENT_RELEASED, nullptr);
 
   refreshOtaPopupUi();
 }
