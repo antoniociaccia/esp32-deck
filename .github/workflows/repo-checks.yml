@@ -1,0 +1,45 @@
+name: Repo checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  repo-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify ignored local secrets are not tracked
+        run: |
+          if git ls-files --error-unmatch secrets.h >/dev/null 2>&1; then
+            echo "secrets.h must not be tracked"
+            exit 1
+          fi
+
+          if git ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then
+            echo "AGENTS.md must not be tracked"
+            exit 1
+          fi
+
+          if git ls-files --error-unmatch n8n-news-workflow.json >/dev/null 2>&1; then
+            echo "n8n-news-workflow.json must not be tracked"
+            exit 1
+          fi
+
+      - name: Check shell scripts syntax
+        run: |
+          zsh -n flash.sh
+          zsh -n flash-monitor.sh
+          zsh -n flash-common.sh
+
+      - name: Check repository docs for local absolute paths
+        run: |
+          if rg -n "/Users/" README.md CONTRIBUTING.md SECURITY.md .github/ISSUE_TEMPLATE .github/pull_request_template.md; then
+            echo "Found local absolute paths in public repo files"
+            exit 1
+          fi

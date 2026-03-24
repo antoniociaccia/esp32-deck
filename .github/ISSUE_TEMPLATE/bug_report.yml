@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible problem on hardware or in the build flow.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and the expected behavior.
+      placeholder: The dashboard boots, but the footer ticker never starts.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact sequence that triggers the issue.
+      placeholder: |
+        1. Flash the board
+        2. Connect to Wi-Fi
+        3. Wait for the first news refresh
+    validations:
+      required: true
+  - type: input
+    id: board
+    attributes:
+      label: Board / display
+      description: Hardware used for the test.
+      placeholder: Freenove ESP32-S3 Display 2.8
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or photos
+      description: Paste relevant serial logs or attach photos of the display.
+      render: shell

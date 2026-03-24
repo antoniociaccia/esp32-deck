@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a user-visible improvement or a new capability.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the current limitation.
+      placeholder: OTA updates require USB flashing today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you want.
+      placeholder: Add a manual OTA check that downloads a signed release manifest.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Constraints, hardware notes, links, screenshots.
