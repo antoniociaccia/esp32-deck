@@ -39,6 +39,7 @@ Struttura:
 - [`dashboard_runtime.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_runtime.cpp): bootstrap dashboard e ciclo runtime
 - [`display.h`](/Users/antoniociaccia/Documents/Arduino/news/src/display.h): interfaccia display/touch
 - [`display.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/display.cpp): bridge `LVGL + TFT_eSPI + touch`
+- [`config_debug.h`](/Users/antoniociaccia/Documents/Arduino/news/src/config_debug.h): flag e macro per debug seriale
 - [`lv_conf.h`](/Users/antoniociaccia/Documents/Arduino/news/lv_conf.h): configurazione locale `LVGL`
 - [`weather_icons.h`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.h): dichiarazioni asset meteo
 - [`weather_icons.c`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.c): inclusione asset meteo generati da `LVGL Image Converter`
@@ -92,6 +93,34 @@ Per velocizzare il ciclo di sviluppo:
 - usa `./flash.sh --build-only` quando vuoi solo verificare che compili
 - usa `./flash.sh --upload-only` se non hai cambiato codice e vuoi riflashare gli artefatti gia compilati
 - evita `--clean` se non stai cambiando toolchain o librerie
+
+## Debug Seriale
+
+Il progetto usa [config_debug.h](/Users/antoniociaccia/Documents/Arduino/news/src/config_debug.h) per controllare i log seriali.
+
+Flag principali:
+- `DEBUG_SERIAL_ENABLED`
+- `DEBUG_SERIAL_LEVEL`
+- `DEBUG_LOG_BOOT`
+- `DEBUG_LOG_NETWORK`
+- `DEBUG_LOG_POWER`
+- `DEBUG_LOG_LVGL`
+- `DEBUG_LOG_SAFE`
+
+Livelli disponibili:
+- `DEBUG_LEVEL_ERROR`
+- `DEBUG_LEVEL_INFO`
+- `DEBUG_LEVEL_VERBOSE`
+
+Macro usate nel codice:
+- `DEBUG_PRINT(level, enabled, message)`
+- `DEBUG_PRINTF(level, enabled, fmt, ...)`
+
+Uso pratico:
+- disattiva tutti i log mettendo `DEBUG_SERIAL_ENABLED = false`
+- lascia attivi solo i log di rete o boot modificando i flag di gruppo
+- abilita `DEBUG_LOG_POWER` se vuoi vedere i cambi di stato batteria
+- abilita `DEBUG_LOG_LVGL` solo per diagnosi mirate, perche puo essere molto verboso
 
 ## Partizioni
 

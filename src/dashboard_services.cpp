@@ -1,6 +1,7 @@
 #include "dashboard_services.h"
 #include "dashboard_app.h"
 #include "dashboard_support.h"
+#include "config_debug.h"
 #include "config_timing.h"
 #include <HTTPClient.h>
 #include <WiFi.h>
@@ -208,13 +209,13 @@ static void ensureWifiConnection() {
 
 void beginTimeSync() {
   if (strlen(WIFI_SSID) == 0) {
-    Serial.println("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
+    DEBUG_NETWORK_PRINT("WiFi non configurato: imposta WIFI_SSID e WIFI_PASSWORD");
     snprintf(app.clockLabelText, sizeof(app.clockLabelText), "config WiFi");
     return;
   }
 
   ensureWifiConnection();
-  Serial.println("Connessione WiFi per NTP...");
+  DEBUG_NETWORK_PRINT("Connessione WiFi per NTP...");
   configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
   app.lastTimeSyncAttemptMs = millis();
 }
@@ -234,13 +235,13 @@ void maintainTimeSync() {
   struct tm timeinfo;
   if (getLocalTime(&timeinfo, 10)) {
     app.timeSynced = true;
-    Serial.println("Orario NTP sincronizzato");
+    DEBUG_NETWORK_PRINT("Orario NTP sincronizzato");
     updateClockUi();
     return;
   }
 
   if (millis() - app.lastTimeSyncAttemptMs > TIMING_NTP_RETRY_MS) {
-    Serial.println("Ritento sync NTP");
+    DEBUG_NETWORK_PRINT("Ritento sync NTP");
     configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
     app.lastTimeSyncAttemptMs = millis();
   }

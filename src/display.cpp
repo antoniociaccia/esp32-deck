@@ -1,4 +1,5 @@
 #include "display.h"
+#include "config_debug.h"
 #include "TFT_eSPI.h"
 #include "FT6336U.h"
 
@@ -34,8 +35,10 @@ static int stabilizeTouchAxis(int currentValue, int previousValue) {
 
 #if LV_USE_LOG != 0
 void my_print(const char *buf) {
-  Serial.printf("%s", buf);
-  Serial.flush();
+  DEBUG_LVGL_PRINTF("%s", buf);
+  if (DEBUG_SHOULD_LOG(DEBUG_LEVEL_VERBOSE, DEBUG_LOG_LVGL)) {
+    Serial.flush();
+  }
 }
 #endif
 

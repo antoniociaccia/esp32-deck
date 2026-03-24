@@ -1,6 +1,7 @@
 #include "dashboard_battery.h"
 #include "dashboard_app.h"
 #include "dashboard_support.h"
+#include "config_debug.h"
 #include "config_power.h"
 #include "config_timing.h"
 #include <math.h>
@@ -108,6 +109,7 @@ void updateBatteryUi() {
     if (previousBatteryPresent != app.batteryPresent
       || previousBatteryPercent != app.batteryPercent
       || previousBatteryVoltage != app.batteryVoltage) {
+      DEBUG_POWER_PRINT("[power] batteria assente o instabile");
       markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
     }
     return;
@@ -136,6 +138,7 @@ void updateBatteryUi() {
   if (previousBatteryPresent != app.batteryPresent
     || previousBatteryPercent != app.batteryPercent
     || previousBatteryVoltage != app.batteryVoltage) {
+    DEBUG_POWER_PRINTF("[power] %.2fV %d%%\n", app.batteryVoltage, app.batteryPercent);
     markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
   }
 }

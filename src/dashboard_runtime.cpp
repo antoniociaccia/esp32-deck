@@ -4,6 +4,7 @@
 #include "dashboard_battery.h"
 #include "dashboard_services.h"
 #include "dashboard_ui.h"
+#include "config_debug.h"
 #include "config_timing.h"
 #include <WiFi.h>
 
@@ -33,26 +34,26 @@ void enterSafeBootRecovery(Display &screen) {
   lv_obj_set_style_text_font(label, &lv_font_montserrat_20, LV_PART_MAIN);
   lv_obj_center(label);
 
-  Serial.println("[boot] safe mode active");
-  Serial.println("[boot] screen.init ok");
+  DEBUG_SAFE_PRINT("[boot] safe mode active");
+  DEBUG_SAFE_PRINT("[boot] screen.init ok");
 }
 
 void initializeDashboard(Display &screen) {
   screen.init();
-  Serial.println("[boot] display init ok");
+  DEBUG_BOOT_PRINT("[boot] display init ok");
 
   strlcpy(app.clockLabelText, "sync orario...", sizeof(app.clockLabelText));
   strlcpy(app.weatherLabelText, "meteo n/d", sizeof(app.weatherLabelText));
   app.weatherIconCode[0] = '\0';
   setDefaultNewsItems();
   createDashboardUi();
-  Serial.println("[boot] ui ok");
+  DEBUG_BOOT_PRINT("[boot] ui ok");
 
   initBatteryMonitoring();
   beginTimeSync();
 
-  Serial.println("Desk dashboard LVGL");
-  Serial.println("Setup done");
+  DEBUG_BOOT_PRINT("Desk dashboard LVGL");
+  DEBUG_BOOT_PRINT("Setup done");
 }
 
 void runSafeModeLoop() {
@@ -61,7 +62,7 @@ void runSafeModeLoop() {
     return;
   }
 
-  Serial.printf("[safe] alive %lus\n", millis() / 1000UL);
+  DEBUG_SAFE_PRINTF("[safe] alive %lus\n", millis() / 1000UL);
   delay(5);
 }
 
