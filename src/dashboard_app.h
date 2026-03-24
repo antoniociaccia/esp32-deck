@@ -31,6 +31,9 @@ struct UiRefs {
   lv_obj_t *tileview = nullptr;
   lv_obj_t *moduleTiles[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleDots[UI_MODULE_COUNT] = {nullptr};
+  lv_obj_t *moduleTitleLabels[UI_MODULE_COUNT] = {nullptr};
+  lv_obj_t *moduleIconRefs[UI_MODULE_COUNT] = {nullptr};
+  lv_obj_t *moduleBadgeLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleValueLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleMetaLabels[UI_MODULE_COUNT] = {nullptr};
 };

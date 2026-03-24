@@ -5,14 +5,30 @@
 #include <WiFi.h>
 #include "weather_icons.h"
 
+static bool lastWifiOnline = false;
+static bool wifiUiInitialized = false;
+static char lastClockHeaderText[24] = {};
+static char lastWeatherHeaderText[32] = {};
+static char lastWeatherHeaderIconCode[8] = {};
+static bool batteryHeaderInitialized = false;
+static bool lastBatteryPresent = false;
+static int lastBatteryPercent = -999;
+static char lastBatteryVoltageText[12] = {};
+
 static void updateWifiUi() {
   if (ui.wifiLabel == nullptr) {
     return;
   }
 
-  lv_label_set_text(ui.wifiLabel, LV_SYMBOL_WIFI);
-  setDashboardLabelColor(ui.wifiLabel,
-    WiFi.status() == WL_CONNECTED ? UI_COLOR_WIFI_ONLINE : UI_COLOR_TEXT_MUTED);
+  bool online = WiFi.status() == WL_CONNECTED;
+  if (wifiUiInitialized && lastWifiOnline == online) {
+    return;
+  }
+
+  setDashboardLabelTextIfChanged(ui.wifiLabel, LV_SYMBOL_WIFI);
+  setDashboardLabelColor(ui.wifiLabel, online ? UI_COLOR_WIFI_ONLINE : UI_COLOR_TEXT_MUTED);
+  lastWifiOnline = online;
+  wifiUiInitialized = true;
 }
 
 static void updateWeatherHeaderIcon(const String &iconCode) {
@@ -21,19 +37,19 @@ static void updateWeatherHeaderIcon(const String &iconCode) {
   }
 
   if (iconCode.startsWith("01")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_SUN);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_SUN);
   } else if (iconCode.startsWith("02") || iconCode.startsWith("03") || iconCode.startsWith("04")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_CLOUD);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_CLOUD);
   } else if (iconCode.startsWith("09") || iconCode.startsWith("10")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_RAIN);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_RAIN);
   } else if (iconCode.startsWith("11")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_STORM);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_STORM);
   } else if (iconCode.startsWith("13")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_SNOW);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_SNOW);
   } else if (iconCode.startsWith("50")) {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_FOG);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_FOG);
   } else {
-    lv_img_set_src(ui.weatherIcon, &IMG_WEATHER_CLOUD);
+    setDashboardImageSourceIfChanged(ui.weatherIcon, &IMG_WEATHER_CLOUD);
   }
 }
 
@@ -43,7 +59,12 @@ static void refreshClockHeaderUi() {
   }
 
   const char *clockText = strlen(app.clockLabelText) > 0 ? app.clockLabelText : "sync orario...";
-  lv_label_set_text(ui.timeLabel, clockText);
+  if (strcmp(lastClockHeaderText, clockText) == 0) {
+    return;
+  }
+
+  setDashboardLabelTextIfChanged(ui.timeLabel, clockText);
+  strlcpy(lastClockHeaderText, clockText, sizeof(lastClockHeaderText));
 }
 
 static void refreshWeatherHeaderUi() {
@@ -52,8 +73,17 @@ static void refreshWeatherHeaderUi() {
   }
 
   const char *weatherText = strlen(app.weatherLabelText) > 0 ? app.weatherLabelText : "meteo n/d";
-  lv_label_set_text(ui.weatherLabel, weatherText);
+  if (strcmp(lastWeatherHeaderText, weatherText) != 0) {
+    setDashboardLabelTextIfChanged(ui.weatherLabel, weatherText);
+    strlcpy(lastWeatherHeaderText, weatherText, sizeof(lastWeatherHeaderText));
+  }
+
+  if (strcmp(lastWeatherHeaderIconCode, app.weatherIconCode) == 0) {
+    return;
+  }
+
   updateWeatherHeaderIcon(String(app.weatherIconCode));
+  strlcpy(lastWeatherHeaderIconCode, app.weatherIconCode, sizeof(lastWeatherHeaderIconCode));
 }
 
 static void refreshBatteryHeaderUi() {
@@ -61,39 +91,49 @@ static void refreshBatteryHeaderUi() {
     return;
   }
 
+  char percentBuffer[12];
+  char voltageBuffer[12];
+  const char *iconText = LV_SYMBOL_BATTERY_EMPTY;
+  uint32_t textColor = UI_COLOR_TEXT_MUTED;
+
   if (!app.batteryPresent || app.batteryPercent < 0) {
-    lv_label_set_text(ui.batteryPercentLabel, "--");
-    lv_label_set_text(ui.batteryVoltageLabel, "--.--V");
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_EMPTY);
-    setDashboardLabelColor(ui.batteryPercentLabel, UI_COLOR_TEXT_MUTED);
-    setDashboardLabelColor(ui.batteryVoltageLabel, UI_COLOR_TEXT_MUTED);
-    setDashboardLabelColor(ui.batteryIconLabel, UI_COLOR_TEXT_MUTED);
+    strlcpy(percentBuffer, "--", sizeof(percentBuffer));
+    strlcpy(voltageBuffer, "--.--V", sizeof(voltageBuffer));
+  } else {
+    snprintf(percentBuffer, sizeof(percentBuffer), "%d%%", app.batteryPercent);
+    snprintf(voltageBuffer, sizeof(voltageBuffer), "%.2fV", app.batteryVoltage);
+
+    if (app.batteryPercent >= 85) {
+      iconText = LV_SYMBOL_BATTERY_FULL;
+    } else if (app.batteryPercent >= 60) {
+      iconText = LV_SYMBOL_BATTERY_3;
+    } else if (app.batteryPercent >= 35) {
+      iconText = LV_SYMBOL_BATTERY_2;
+    } else if (app.batteryPercent >= 15) {
+      iconText = LV_SYMBOL_BATTERY_1;
+    }
+
+    textColor = UI_COLOR_BATTERY_OK;
+  }
+
+  if (batteryHeaderInitialized
+    && lastBatteryPresent == app.batteryPresent
+    && lastBatteryPercent == app.batteryPercent
+    && strcmp(lastBatteryVoltageText, voltageBuffer) == 0) {
     return;
   }
 
-  char percentBuffer[12];
-  snprintf(percentBuffer, sizeof(percentBuffer), "%d%%", app.batteryPercent);
-  lv_label_set_text(ui.batteryPercentLabel, percentBuffer);
+  setDashboardLabelTextIfChanged(ui.batteryPercentLabel, percentBuffer);
+  setDashboardLabelTextIfChanged(ui.batteryVoltageLabel, voltageBuffer);
+  setDashboardLabelTextIfChanged(ui.batteryIconLabel, iconText);
+  setDashboardLabelColor(ui.batteryPercentLabel, textColor);
+  setDashboardLabelColor(ui.batteryVoltageLabel, textColor);
+  setDashboardLabelColor(ui.batteryIconLabel, textColor);
 
-  char voltageBuffer[12];
-  snprintf(voltageBuffer, sizeof(voltageBuffer), "%.2fV", app.batteryVoltage);
-  lv_label_set_text(ui.batteryVoltageLabel, voltageBuffer);
-
-  if (app.batteryPercent >= 85) {
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_FULL);
-  } else if (app.batteryPercent >= 60) {
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_3);
-  } else if (app.batteryPercent >= 35) {
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_2);
-  } else if (app.batteryPercent >= 15) {
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_1);
-  } else {
-    lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_EMPTY);
-  }
-
-  setDashboardLabelColor(ui.batteryPercentLabel, UI_COLOR_BATTERY_OK);
-  setDashboardLabelColor(ui.batteryVoltageLabel, UI_COLOR_BATTERY_OK);
-  setDashboardLabelColor(ui.batteryIconLabel, UI_COLOR_BATTERY_OK);
+  lastBatteryPresent = app.batteryPresent;
+  lastBatteryPercent = app.batteryPercent;
+  strlcpy(lastBatteryVoltageText, voltageBuffer, sizeof(lastBatteryVoltageText));
+  batteryHeaderInitialized = true;
 }
 
 void createDashboardHeader(lv_obj_t *parent) {

@@ -14,6 +14,33 @@ void setDashboardLabelColor(lv_obj_t *label, uint32_t colorHex) {
   lv_obj_set_style_text_color(label, colorFromHex(colorHex), LV_PART_MAIN);
 }
 
+bool setDashboardLabelTextIfChanged(lv_obj_t *label, const char *text) {
+  if (label == nullptr || text == nullptr) {
+    return false;
+  }
+
+  const char *currentText = lv_label_get_text(label);
+  if (currentText != nullptr && strcmp(currentText, text) == 0) {
+    return false;
+  }
+
+  lv_label_set_text(label, text);
+  return true;
+}
+
+bool setDashboardImageSourceIfChanged(lv_obj_t *image, const void *src) {
+  if (image == nullptr || src == nullptr) {
+    return false;
+  }
+
+  if (lv_img_get_src(image) == src) {
+    return false;
+  }
+
+  lv_img_set_src(image, src);
+  return true;
+}
+
 void styleDashboardPanel(lv_obj_t *panel, uint32_t bgColorHex, uint32_t borderColorHex) {
   lv_obj_set_style_radius(panel, UI_PANEL_RADIUS, 0);
   lv_obj_set_style_border_width(panel, 1, 0);

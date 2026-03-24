@@ -6,6 +6,8 @@ static const uint16_t rawTouchWidth = 240;
 static const uint16_t rawTouchHeight = 320;
 static const uint16_t screenWidth = 320;
 static const uint16_t screenHeight = 240;
+static const int touchJitterThresholdPx = 4;
+static const int touchSmoothingWeight = 3;
 
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * 10];
@@ -16,6 +18,19 @@ static volatile int lastTouchY = -1;
 TFT_eSPI tft = TFT_eSPI(screenWidth, screenHeight);
 FT6336U ft6336u(I2C_SDA, I2C_SCL, RST_N_PIN, INT_N_PIN);
 FT6336U_TouchPointType tp;
+
+static int stabilizeTouchAxis(int currentValue, int previousValue) {
+  if (previousValue < 0) {
+    return currentValue;
+  }
+
+  int delta = currentValue - previousValue;
+  if (abs(delta) <= touchJitterThresholdPx) {
+    return previousValue;
+  }
+
+  return (previousValue + (currentValue * touchSmoothingWeight)) / (touchSmoothingWeight + 1);
+}
 
 #if LV_USE_LOG != 0
 void my_print(const char *buf) {
@@ -77,6 +92,11 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
   }
 
   if (x >= 0 && x < screenWidth && y >= 0 && y < screenHeight) {
+    if (touchPressed) {
+      x = stabilizeTouchAxis(x, lastTouchX);
+      y = stabilizeTouchAxis(y, lastTouchY);
+    }
+
     touchPressed = true;
     lastTouchX = x;
     lastTouchY = y;

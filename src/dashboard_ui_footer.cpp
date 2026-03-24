@@ -2,6 +2,8 @@
 #include "dashboard_app.h"
 #include "dashboard_ui_shared.h"
 
+static char lastNewsTickerText[NEWS_MAX_TICKER_LEN] = {};
+
 void createDashboardFooter(lv_obj_t *parent) {
   lv_obj_t *footer = lv_obj_create(parent);
   lv_obj_set_size(footer, UI_FOOTER_WIDTH, UI_FOOTER_HEIGHT);
@@ -28,5 +30,10 @@ void refreshDashboardFooterUi() {
     return;
   }
 
-  lv_label_set_text(ui.newsLabel, app.newsTicker);
+  if (strcmp(lastNewsTickerText, app.newsTicker) == 0) {
+    return;
+  }
+
+  setDashboardLabelTextIfChanged(ui.newsLabel, app.newsTicker);
+  strlcpy(lastNewsTickerText, app.newsTicker, sizeof(lastNewsTickerText));
 }
