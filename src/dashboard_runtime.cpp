@@ -56,6 +56,8 @@ void initializeDashboard(Display &screen) {
   app.otaApplyRequested = false;
   app.otaApplyState = OTA_APPLY_IDLE;
   app.otaApplyProgressPercent = -1;
+  app.otaApplyBytesCurrent = 0;
+  app.otaApplyBytesTotal = 0;
   app.otaApplyLastErrorCode = 0;
   app.otaApplyStatusText[0] = '\0';
   setDefaultNewsItems();

@@ -372,6 +372,8 @@ void requestOtaManifestRefresh() {
   app.otaApplyRequested = false;
   app.otaApplyState = OTA_APPLY_IDLE;
   app.otaApplyProgressPercent = -1;
+  app.otaApplyBytesCurrent = 0;
+  app.otaApplyBytesTotal = 0;
   app.otaApplyLastErrorCode = 0;
   app.otaApplyStatusText[0] = '\0';
   app.otaState = SERVICE_FETCH_IDLE;
@@ -406,6 +408,8 @@ void startOtaFirmwareUpdate() {
   }
 
   setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Preparazione OTA...");
+  app.otaApplyBytesCurrent = 0;
+  app.otaApplyBytesTotal = 0;
   pumpOtaUi();
 
   WiFiClientSecure client;
@@ -417,23 +421,43 @@ void startOtaFirmwareUpdate() {
 
   updater.onStart([]() {
     setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Download firmware...");
+    app.otaApplyBytesCurrent = 0;
+    app.otaApplyBytesTotal = 0;
     pumpOtaUi();
   });
 
   updater.onProgress([](int current, int total) {
-    int percent = 0;
+    int percent = -1;
     if (total > 0) {
       percent = (current * 100) / total;
     }
 
-    char statusText[64];
-    snprintf(statusText, sizeof(statusText), "Download firmware... %d%%", percent);
+    app.otaApplyBytesCurrent = current > 0 ? static_cast<uint32_t>(current) : 0;
+    app.otaApplyBytesTotal = total > 0 ? static_cast<uint32_t>(total) : 0;
+
+    char statusText[96];
+    if (total > 0) {
+      snprintf(
+        statusText,
+        sizeof(statusText),
+        "Download firmware... %d%% (%lu/%lu KB)",
+        percent,
+        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL),
+        static_cast<unsigned long>(app.otaApplyBytesTotal / 1024UL));
+    } else {
+      snprintf(
+        statusText,
+        sizeof(statusText),
+        "Download firmware... %lu KB",
+        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL));
+    }
     setOtaApplyState(OTA_APPLY_IN_PROGRESS, percent, 0, statusText);
     pumpOtaUi();
   });
 
   updater.onEnd([]() {
     setOtaApplyState(OTA_APPLY_SUCCESS, 100, 0, "Update installato. Riavvio...");
+    app.otaApplyBytesCurrent = app.otaApplyBytesTotal;
     pumpOtaUi();
   });
 
@@ -447,6 +471,7 @@ void startOtaFirmwareUpdate() {
   HTTPUpdateResult result = updater.update(client, String(app.otaRemoteBinUrl), String(FW_VERSION));
   if (result == HTTP_UPDATE_OK) {
     setOtaApplyState(OTA_APPLY_SUCCESS, 100, 0, "Update installato. Riavvio...");
+    app.otaApplyBytesCurrent = app.otaApplyBytesTotal;
     pumpOtaUi();
     delay(500);
     ESP.restart();

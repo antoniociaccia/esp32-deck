@@ -150,6 +150,7 @@ static uint32_t otaHeaderColor() {
 
 static void buildOtaPopupText(char *buffer, size_t bufferSize) {
   char sizeBuffer[24];
+  char progressBuffer[48];
   if (app.otaRemoteSizeBytes > 0) {
     snprintf(sizeBuffer, sizeof(sizeBuffer), "%lu KB", static_cast<unsigned long>(app.otaRemoteSizeBytes / 1024UL));
   } else {
@@ -157,11 +158,29 @@ static void buildOtaPopupText(char *buffer, size_t bufferSize) {
   }
 
   if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
+    if (app.otaApplyBytesTotal > 0) {
+      snprintf(
+        progressBuffer,
+        sizeof(progressBuffer),
+        "%d%% (%lu/%lu KB)",
+        app.otaApplyProgressPercent >= 0 ? app.otaApplyProgressPercent : 0,
+        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL),
+        static_cast<unsigned long>(app.otaApplyBytesTotal / 1024UL));
+    } else if (app.otaApplyBytesCurrent > 0) {
+      snprintf(
+        progressBuffer,
+        sizeof(progressBuffer),
+        "%lu KB scaricati",
+        static_cast<unsigned long>(app.otaApplyBytesCurrent / 1024UL));
+    } else {
+      strlcpy(progressBuffer, "avvio download...", sizeof(progressBuffer));
+    }
+
     snprintf(buffer, bufferSize,
-      "Aggiornamento in corso.\nVersione corrente: %s\nVersione remota: %s\nProgresso: %d%%\n%s",
+      "Aggiornamento in corso.\nVersione corrente: %s\nVersione remota: %s\nProgresso: %s\n%s",
       FW_VERSION,
       app.otaRemoteVersion[0] != '\0' ? app.otaRemoteVersion : "n/d",
-      app.otaApplyProgressPercent >= 0 ? app.otaApplyProgressPercent : 0,
+      progressBuffer,
       app.otaApplyStatusText[0] != '\0' ? app.otaApplyStatusText : "Download firmware...");
     return;
   }

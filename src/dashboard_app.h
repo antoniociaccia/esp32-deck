@@ -119,6 +119,8 @@ struct AppState {
   bool otaApplyRequested = false;
   OtaApplyState otaApplyState = OTA_APPLY_IDLE;
   int otaApplyProgressPercent = -1;
+  uint32_t otaApplyBytesCurrent = 0;
+  uint32_t otaApplyBytesTotal = 0;
   int otaApplyLastErrorCode = 0;
   char otaApplyStatusText[96] = {};
   uint32_t uiDirtyMask = UI_DIRTY_ALL;
