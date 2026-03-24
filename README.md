@@ -98,7 +98,13 @@ Per velocizzare il ciclo di sviluppo:
 
 Il progetto usa [config_debug.h](/Users/antoniociaccia/Documents/Arduino/news/src/config_debug.h) per controllare i log seriali.
 
+Di default il firmware usa il profilo `production`, quindi i log seriali applicativi restano spenti.
+Per sviluppo puoi passare a `DEBUG_PROFILE_DEVELOPMENT`.
+
 Flag principali:
+- `DEBUG_PROFILE`
+- `DEBUG_PROFILE_PRODUCTION`
+- `DEBUG_PROFILE_DEVELOPMENT`
 - `DEBUG_SERIAL_ENABLED`
 - `DEBUG_SERIAL_LEVEL`
 - `DEBUG_LOG_BOOT`
@@ -117,7 +123,8 @@ Macro usate nel codice:
 - `DEBUG_PRINTF(level, enabled, fmt, ...)`
 
 Uso pratico:
-- disattiva tutti i log mettendo `DEBUG_SERIAL_ENABLED = false`
+- per una build pulita lascia `DEBUG_PROFILE = DEBUG_PROFILE_PRODUCTION`
+- per sviluppo imposta `DEBUG_PROFILE = DEBUG_PROFILE_DEVELOPMENT`
 - lascia attivi solo i log di rete o boot modificando i flag di gruppo
 - abilita `DEBUG_LOG_POWER` se vuoi vedere i cambi di stato batteria
 - abilita `DEBUG_LOG_LVGL` solo per diagnosi mirate, perche puo essere molto verboso

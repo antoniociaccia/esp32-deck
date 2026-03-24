@@ -3,19 +3,24 @@
 
 #include <Arduino.h>
 
-static constexpr bool DEBUG_SERIAL_ENABLED = true;
+static constexpr uint8_t DEBUG_PROFILE_PRODUCTION = 0;
+static constexpr uint8_t DEBUG_PROFILE_DEVELOPMENT = 1;
 
 static constexpr uint8_t DEBUG_LEVEL_ERROR = 0;
 static constexpr uint8_t DEBUG_LEVEL_INFO = 1;
 static constexpr uint8_t DEBUG_LEVEL_VERBOSE = 2;
 
-static constexpr uint8_t DEBUG_SERIAL_LEVEL = DEBUG_LEVEL_INFO;
+static constexpr uint8_t DEBUG_PROFILE = DEBUG_PROFILE_PRODUCTION;
 
-static constexpr bool DEBUG_LOG_BOOT = true;
-static constexpr bool DEBUG_LOG_NETWORK = true;
+static constexpr bool DEBUG_SERIAL_ENABLED = DEBUG_PROFILE != DEBUG_PROFILE_PRODUCTION;
+static constexpr uint8_t DEBUG_SERIAL_LEVEL =
+  DEBUG_PROFILE == DEBUG_PROFILE_DEVELOPMENT ? DEBUG_LEVEL_INFO : DEBUG_LEVEL_ERROR;
+
+static constexpr bool DEBUG_LOG_BOOT = DEBUG_PROFILE == DEBUG_PROFILE_DEVELOPMENT;
+static constexpr bool DEBUG_LOG_NETWORK = DEBUG_PROFILE == DEBUG_PROFILE_DEVELOPMENT;
 static constexpr bool DEBUG_LOG_POWER = false;
 static constexpr bool DEBUG_LOG_LVGL = false;
-static constexpr bool DEBUG_LOG_SAFE = true;
+static constexpr bool DEBUG_LOG_SAFE = DEBUG_PROFILE == DEBUG_PROFILE_DEVELOPMENT;
 
 #define DEBUG_SHOULD_LOG(level, enabled) (DEBUG_SERIAL_ENABLED && (enabled) && ((level) <= DEBUG_SERIAL_LEVEL))
 
