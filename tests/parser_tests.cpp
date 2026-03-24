@@ -61,12 +61,56 @@ static void testParseNewsItemsFailure() {
   assert(std::strcmp(app.newsTicker, previousTicker) == 0);
 }
 
+static void testBuildNewsFooterTextReady() {
+  bool ok = parseNewsItems(String("{\"items\":[{\"text\":\"TECH | Footer live\"}]}"));
+  assert(ok);
+  app.newsState = SERVICE_FETCH_READY;
+  app.newsLastHttpCode = 200;
+
+  char footer[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footer, sizeof(footer));
+
+  assert(std::strcmp(footer, app.newsTicker) == 0);
+}
+
+static void testBuildNewsFooterTextCachedHttpError() {
+  bool ok = parseNewsItems(String("{\"items\":[{\"text\":\"TECH | Cached titolo\"}]}"));
+  assert(ok);
+  app.newsValid = false;
+  app.newsState = SERVICE_FETCH_HTTP_ERROR;
+  app.newsLastHttpCode = 503;
+
+  char footer[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footer, sizeof(footer));
+
+  assert(std::strstr(footer, "HTTP 503") != nullptr);
+  assert(std::strstr(footer, "cache") != nullptr);
+  assert(std::strstr(footer, "Cached titolo") != nullptr);
+}
+
+static void testBuildNewsFooterTextOfflineNoCache() {
+  app.newsItemCount = 0;
+  app.newsTicker[0] = '\0';
+  app.newsValid = false;
+  app.newsState = SERVICE_FETCH_OFFLINE;
+  app.newsLastHttpCode = 0;
+
+  char footer[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footer, sizeof(footer));
+
+  assert(std::strstr(footer, "offline") != nullptr);
+  assert(std::strstr(footer, "nessun feed disponibile") != nullptr);
+}
+
 int main() {
   testSetDefaultNewsItems();
   testParseWeatherPayloadSuccess();
   testParseWeatherPayloadFailure();
   testParseNewsItemsSuccess();
   testParseNewsItemsFailure();
+  testBuildNewsFooterTextReady();
+  testBuildNewsFooterTextCachedHttpError();
+  testBuildNewsFooterTextOfflineNoCache();
 
   std::puts("parser tests: ok");
   return 0;

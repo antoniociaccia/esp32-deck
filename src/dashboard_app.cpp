@@ -259,6 +259,75 @@ void setDefaultNewsItems() {
   rebuildNewsTicker();
 }
 
+const char *serviceFetchStateLabel(ServiceFetchState state) {
+  switch (state) {
+    case SERVICE_FETCH_READY:
+      return "ready";
+    case SERVICE_FETCH_OFFLINE:
+      return "offline";
+    case SERVICE_FETCH_CONFIG_MISSING:
+      return "config";
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+      return "transport";
+    case SERVICE_FETCH_HTTP_ERROR:
+      return "http";
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      return "invalid-payload";
+    case SERVICE_FETCH_IDLE:
+    default:
+      return "idle";
+  }
+}
+
+void buildNewsFooterText(char *buffer, size_t bufferSize) {
+  if (buffer == nullptr || bufferSize == 0) {
+    return;
+  }
+
+  buffer[0] = '\0';
+
+  if (app.newsState == SERVICE_FETCH_READY) {
+    if (app.newsTicker[0] != '\0') {
+      strlcpy(buffer, app.newsTicker, bufferSize);
+    } else {
+      strlcpy(buffer, "NEWS | feed live ma vuoto", bufferSize);
+    }
+    return;
+  }
+
+  switch (app.newsState) {
+    case SERVICE_FETCH_IDLE:
+      strlcpy(buffer, "NEWS | attesa primo aggiornamento", bufferSize);
+      break;
+    case SERVICE_FETCH_OFFLINE:
+      strlcpy(buffer, "NEWS | offline", bufferSize);
+      break;
+    case SERVICE_FETCH_CONFIG_MISSING:
+      strlcpy(buffer, "NEWS | config mancante", bufferSize);
+      break;
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+      strlcpy(buffer, "NEWS | errore rete", bufferSize);
+      break;
+    case SERVICE_FETCH_HTTP_ERROR:
+      snprintf(buffer, bufferSize, "NEWS | HTTP %d", app.newsLastHttpCode);
+      break;
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      strlcpy(buffer, "NEWS | payload non valido", bufferSize);
+      break;
+    case SERVICE_FETCH_READY:
+    default:
+      strlcpy(buffer, "NEWS", bufferSize);
+      break;
+  }
+
+  if (app.newsItemCount > 0 && app.newsTicker[0] != '\0') {
+    strlcat(buffer, " | cache | ", bufferSize);
+    strlcat(buffer, app.newsTicker, bufferSize);
+  } else {
+    strlcat(buffer, " | nessun feed disponibile", bufferSize);
+  }
+}
+
 bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconCodeOut, size_t iconCodeOutSize) {
   int mainStart = 0;
   int mainEnd = 0;

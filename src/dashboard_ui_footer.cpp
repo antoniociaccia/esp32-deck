@@ -1,5 +1,6 @@
 #include "dashboard_ui_footer.h"
 #include "dashboard_app.h"
+#include "dashboard_support.h"
 #include "dashboard_ui_shared.h"
 
 static char lastNewsTickerText[NEWS_MAX_TICKER_LEN] = {};
@@ -19,7 +20,9 @@ void createDashboardFooter(lv_obj_t *parent) {
   lv_label_set_long_mode(ui.newsLabel, LV_LABEL_LONG_SCROLL_CIRCULAR);
   lv_obj_set_scrollbar_mode(ui.newsLabel, LV_SCROLLBAR_MODE_OFF);
   lv_obj_clear_flag(ui.newsLabel, LV_OBJ_FLAG_SCROLLABLE);
-  lv_label_set_text(ui.newsLabel, app.newsTicker);
+  char footerText[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footerText, sizeof(footerText));
+  lv_label_set_text(ui.newsLabel, footerText);
   setDashboardLabelFont(ui.newsLabel, &lv_font_montserrat_16);
   setDashboardLabelColor(ui.newsLabel, UI_COLOR_TEXT_NEWS);
   lv_obj_align(ui.newsLabel, LV_ALIGN_LEFT_MID, 0, 0);
@@ -30,10 +33,12 @@ void refreshDashboardFooterUi() {
     return;
   }
 
-  if (strcmp(lastNewsTickerText, app.newsTicker) == 0) {
+  char footerText[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footerText, sizeof(footerText));
+  if (strcmp(lastNewsTickerText, footerText) == 0) {
     return;
   }
 
-  setDashboardLabelTextIfChanged(ui.newsLabel, app.newsTicker);
-  strlcpy(lastNewsTickerText, app.newsTicker, sizeof(lastNewsTickerText));
+  setDashboardLabelTextIfChanged(ui.newsLabel, footerText);
+  strlcpy(lastNewsTickerText, footerText, sizeof(lastNewsTickerText));
 }

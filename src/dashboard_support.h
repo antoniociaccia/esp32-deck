@@ -17,6 +17,8 @@ String decodeJsonString(const String &value);
 void normalizeNewsText(String &text);
 void rebuildNewsTicker();
 void setDefaultNewsItems();
+const char *serviceFetchStateLabel(ServiceFetchState state);
+void buildNewsFooterText(char *buffer, size_t bufferSize);
 bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconCodeOut, size_t iconCodeOutSize);
 bool parseNewsItems(const String &payload);
 

@@ -42,6 +42,32 @@ static void markWeatherUiDirtyIfChanged(
   }
 }
 
+static void logWeatherStateIfChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousTemperature,
+  const char *previousWeatherText,
+  const char *previousWeatherIconCode) {
+  if (!weatherUiStateChanged(
+      previousState,
+      previousHttpCode,
+      previousValid,
+      previousTemperature,
+      previousWeatherText,
+      previousWeatherIconCode)) {
+    return;
+  }
+
+  DEBUG_NETWORK_PRINTF(
+    "Weather state=%s http=%d valid=%d temp=%d label='%s'\n",
+    serviceFetchStateLabel(app.weatherState),
+    app.weatherLastHttpCode,
+    app.weatherValid ? 1 : 0,
+    app.weatherTemperatureC,
+    app.weatherLabelText);
+}
+
 static void setWeatherFetchFailure(ServiceFetchState state, const char *labelText, int httpCode = 0) {
   app.weatherValid = false;
   app.weatherState = state;
@@ -82,6 +108,31 @@ static void markNewsUiDirtyIfChanged(
       previousFirstNewsItem)) {
     markUiDirty(UI_DIRTY_FOOTER | UI_DIRTY_MAIN_NEWS);
   }
+}
+
+static void logNewsStateIfChanged(
+  ServiceFetchState previousState,
+  int previousHttpCode,
+  bool previousValid,
+  int previousNewsItemCount,
+  const char *previousNewsTicker,
+  const char *previousFirstNewsItem) {
+  if (!newsUiStateChanged(
+      previousState,
+      previousHttpCode,
+      previousValid,
+      previousNewsItemCount,
+      previousNewsTicker,
+      previousFirstNewsItem)) {
+    return;
+  }
+
+  DEBUG_NETWORK_PRINTF(
+    "News state=%s http=%d valid=%d items=%d\n",
+    serviceFetchStateLabel(app.newsState),
+    app.newsLastHttpCode,
+    app.newsValid ? 1 : 0,
+    app.newsItemCount);
 }
 
 void updateClockUi() {
@@ -252,6 +303,8 @@ void updateWeatherUi() {
 
   if (WiFi.status() != WL_CONNECTED) {
     setWeatherFetchFailure(SERVICE_FETCH_OFFLINE, "meteo offline");
+    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
@@ -259,6 +312,8 @@ void updateWeatherUi() {
 
   if (strlen(OPENWEATHER_API_KEY) == 0) {
     setWeatherFetchFailure(SERVICE_FETCH_CONFIG_MISSING, "meteo n/d");
+    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
@@ -269,6 +324,8 @@ void updateWeatherUi() {
   prepareSecureHttpClient(http, client);
   if (!http.begin(client, buildWeatherUrl())) {
     setWeatherFetchFailure(SERVICE_FETCH_TRANSPORT_ERROR, "meteo rete");
+    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
@@ -278,6 +335,8 @@ void updateWeatherUi() {
   if (httpCode != HTTP_CODE_OK) {
     setWeatherFetchFailure(SERVICE_FETCH_HTTP_ERROR, "meteo http", httpCode);
     http.end();
+    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
@@ -290,6 +349,8 @@ void updateWeatherUi() {
   char iconCode[sizeof(app.weatherIconCode)] = {};
   if (!parseWeatherPayload(payload, temperature, iconCode, sizeof(iconCode))) {
     setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
+    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
       previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
     return;
@@ -302,6 +363,8 @@ void updateWeatherUi() {
   app.weatherLastHttpCode = httpCode;
   app.weatherTemperatureC = temperature;
 
+  logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
+    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
   markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
     previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
 }
@@ -330,6 +393,8 @@ void updateNewsFeed() {
     app.newsValid = false;
     app.newsState = SERVICE_FETCH_OFFLINE;
     app.newsLastHttpCode = 0;
+    logNewsStateIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
       previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
@@ -339,6 +404,8 @@ void updateNewsFeed() {
     app.newsValid = false;
     app.newsState = SERVICE_FETCH_CONFIG_MISSING;
     app.newsLastHttpCode = 0;
+    logNewsStateIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
       previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
@@ -351,6 +418,8 @@ void updateNewsFeed() {
     app.newsValid = false;
     app.newsState = SERVICE_FETCH_TRANSPORT_ERROR;
     app.newsLastHttpCode = 0;
+    logNewsStateIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
       previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
@@ -363,6 +432,8 @@ void updateNewsFeed() {
     app.newsState = SERVICE_FETCH_HTTP_ERROR;
     app.newsLastHttpCode = httpCode;
     http.end();
+    logNewsStateIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+      previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
       previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
     return;
@@ -374,6 +445,8 @@ void updateNewsFeed() {
   app.newsValid = parseNewsItems(payload);
   app.newsState = app.newsValid ? SERVICE_FETCH_READY : SERVICE_FETCH_INVALID_PAYLOAD;
   app.newsLastHttpCode = httpCode;
+  logNewsStateIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
+    previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
   markNewsUiDirtyIfChanged(previousNewsState, previousNewsHttpCode, previousNewsValid,
     previousNewsItemCount, previousNewsTicker, previousFirstNewsItem);
 }
