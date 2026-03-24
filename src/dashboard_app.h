@@ -7,10 +7,13 @@
 #include "config_network.h"
 #include "dashboard_ota.h"
 
-struct ModuleContent {
+struct ModuleCardDef {
   const char *title;
   const char *value;
   const char *meta;
+  uint32_t dirtyMask;
+  void (*createCb)(lv_obj_t *tile, int moduleIndex);
+  void (*updateCb)();
 };
 
 struct BatteryReading {

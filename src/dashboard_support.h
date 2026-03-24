@@ -8,7 +8,6 @@
 #include "dashboard_app.h"
 
 extern const char *const DEFAULT_NEWS_ITEMS[NEWS_DEFAULT_ITEM_COUNT];
-extern const ModuleContent MODULES[UI_MODULE_COUNT];
 
 lv_color_t colorFromHex(uint32_t hex);
 bool intervalElapsed(unsigned long &lastRunMs, unsigned long intervalMs);

@@ -31,6 +31,25 @@ static const void *lastWeatherModuleIconSource = nullptr;
 static int lastStyledModuleIndex = -1;
 static int lastDotsModuleIndex = -1;
 
+static void createSettingsModuleCard(lv_obj_t *tile, int moduleIndex);
+static void updateSettingsModuleCard();
+static void createClockModuleCard(lv_obj_t *tile, int moduleIndex);
+static void updateClockModuleCard();
+static void createPowerModuleCard(lv_obj_t *tile, int moduleIndex);
+static void updatePowerModuleCard();
+static void createWeatherModuleCard(lv_obj_t *tile, int moduleIndex);
+static void updateWeatherModuleCard();
+static void createNewsModuleCard(lv_obj_t *tile, int moduleIndex);
+static void updateNewsModuleCard();
+
+static const ModuleCardDef MODULE_REGISTRY[UI_MODULE_COUNT] = {
+  {"Settings", "Configura", "energia, rete e sistema", UI_DIRTY_ALL, createSettingsModuleCard, updateSettingsModuleCard},
+  {"Clock", "--:--", "attesa sync NTP", UI_DIRTY_MAIN_CLOCK, createClockModuleCard, updateClockModuleCard},
+  {"Power", "--", "attesa batteria", UI_DIRTY_MAIN_POWER, createPowerModuleCard, updatePowerModuleCard},
+  {"Weather", "--", "attesa meteo", UI_DIRTY_MAIN_WEATHER, createWeatherModuleCard, updateWeatherModuleCard},
+  {"News", "--", "attesa feed", UI_DIRTY_MAIN_NEWS, createNewsModuleCard, updateNewsModuleCard}
+};
+
 static bool wifiOnline() {
   return WiFi.status() == WL_CONNECTED;
 }
@@ -225,7 +244,7 @@ static lv_obj_t *createModuleTopRow(lv_obj_t *parent, int moduleIndex) {
   lv_obj_clear_flag(topRow, LV_OBJ_FLAG_SCROLLABLE);
 
   ui.moduleTitleLabels[moduleIndex] = lv_label_create(topRow);
-  lv_label_set_text(ui.moduleTitleLabels[moduleIndex], MODULES[moduleIndex].title);
+  lv_label_set_text(ui.moduleTitleLabels[moduleIndex], MODULE_REGISTRY[moduleIndex].title);
   setDashboardLabelFont(ui.moduleTitleLabels[moduleIndex], &lv_font_montserrat_12);
   setDashboardLabelColor(ui.moduleTitleLabels[moduleIndex], UI_COLOR_TEXT_SECONDARY);
 
@@ -237,180 +256,75 @@ static lv_obj_t *createModuleTopRow(lv_obj_t *parent, int moduleIndex) {
   return topRow;
 }
 
-static void createClockModuleCard(lv_obj_t *tile, int moduleIndex) {
+static void createStandardModuleCard(lv_obj_t *tile, int moduleIndex,
+                                     const char* defaultIcon,
+                                     const lv_font_t* iconFont,
+                                     const lv_font_t* valueFont,
+                                     const lv_font_t* metaFont,
+                                     uint32_t valueColor,
+                                     uint32_t metaColor,
+                                     lv_coord_t metaHeight = 0) {
   createModuleTopRow(tile, moduleIndex);
   createDashboardSpacer(tile, 8);
 
-  lv_obj_t *centerRow = lv_obj_create(tile);
-  lv_obj_set_width(centerRow, lv_pct(100));
-  lv_obj_set_height(centerRow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(centerRow, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(centerRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(centerRow, 0, 0);
-  lv_obj_set_style_pad_gap(centerRow, 10, 0);
-  lv_obj_set_style_bg_opa(centerRow, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(centerRow, 0, 0);
-  lv_obj_clear_flag(centerRow, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *heroRow = lv_obj_create(tile);
+  lv_obj_set_width(heroRow, lv_pct(100));
+  lv_obj_set_height(heroRow, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(heroRow, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(heroRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(heroRow, 0, 0);
+  lv_obj_set_style_pad_gap(heroRow, 8, 0);
+  lv_obj_set_style_bg_opa(heroRow, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(heroRow, 0, 0);
+  lv_obj_clear_flag(heroRow, LV_OBJ_FLAG_SCROLLABLE);
 
-  ui.moduleIconRefs[moduleIndex] = lv_label_create(centerRow);
-  lv_label_set_text(ui.moduleIconRefs[moduleIndex], LV_SYMBOL_REFRESH);
-  setDashboardLabelFont(ui.moduleIconRefs[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleIconRefs[moduleIndex], UI_COLOR_CARD_ICON_SOFT);
+  if (defaultIcon != nullptr) {
+    ui.moduleIconRefs[moduleIndex] = lv_label_create(heroRow);
+    lv_label_set_text(ui.moduleIconRefs[moduleIndex], defaultIcon);
+    setDashboardLabelFont(ui.moduleIconRefs[moduleIndex], iconFont);
+    setDashboardLabelColor(ui.moduleIconRefs[moduleIndex], UI_COLOR_CARD_ICON_SOFT);
+  } else {
+    ui.moduleIconRefs[moduleIndex] = lv_img_create(heroRow);
+    lv_img_set_src(ui.moduleIconRefs[moduleIndex], &IMG_WEATHER_CLOUD);
+    lv_obj_clear_flag(ui.moduleIconRefs[moduleIndex], LV_OBJ_FLAG_SCROLLABLE);
+  }
 
-  ui.moduleValueLabels[moduleIndex] = lv_label_create(centerRow);
-  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULES[moduleIndex].value);
-  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], UI_COLOR_TEXT_PRIMARY);
+  ui.moduleValueLabels[moduleIndex] = lv_label_create(heroRow);
+  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULE_REGISTRY[moduleIndex].value);
+  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], valueFont);
+  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], valueColor);
 
-  createDashboardSpacer(tile, 10);
+  createDashboardSpacer(tile, 8);
 
   ui.moduleMetaLabels[moduleIndex] = lv_label_create(tile);
   lv_obj_set_width(ui.moduleMetaLabels[moduleIndex], lv_pct(100));
-  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULES[moduleIndex].meta);
+  if (metaHeight > 0) {
+    lv_obj_set_height(ui.moduleMetaLabels[moduleIndex], metaHeight);
+  }
+  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULE_REGISTRY[moduleIndex].meta);
   lv_label_set_long_mode(ui.moduleMetaLabels[moduleIndex], LV_LABEL_LONG_WRAP);
-  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], &lv_font_montserrat_12);
-  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], UI_COLOR_TEXT_SECONDARY);
+  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], metaFont);
+  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], metaColor);
+}
+
+static void createClockModuleCard(lv_obj_t *tile, int moduleIndex) {
+  createStandardModuleCard(tile, moduleIndex, LV_SYMBOL_REFRESH, &lv_font_montserrat_20, &lv_font_montserrat_20, &lv_font_montserrat_12, UI_COLOR_TEXT_PRIMARY, UI_COLOR_TEXT_SECONDARY);
 }
 
 static void createPowerModuleCard(lv_obj_t *tile, int moduleIndex) {
-  createModuleTopRow(tile, moduleIndex);
-  createDashboardSpacer(tile, 6);
-
-  lv_obj_t *heroRow = lv_obj_create(tile);
-  lv_obj_set_width(heroRow, lv_pct(100));
-  lv_obj_set_height(heroRow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(heroRow, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(heroRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(heroRow, 0, 0);
-  lv_obj_set_style_pad_gap(heroRow, 10, 0);
-  lv_obj_set_style_bg_opa(heroRow, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(heroRow, 0, 0);
-  lv_obj_clear_flag(heroRow, LV_OBJ_FLAG_SCROLLABLE);
-
-  ui.moduleIconRefs[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleIconRefs[moduleIndex], LV_SYMBOL_BATTERY_3);
-  setDashboardLabelFont(ui.moduleIconRefs[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleIconRefs[moduleIndex], UI_COLOR_CARD_ICON_SOFT);
-
-  ui.moduleValueLabels[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULES[moduleIndex].value);
-  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], UI_COLOR_TEXT_PRIMARY);
-
-  createDashboardSpacer(tile, 8);
-
-  ui.moduleMetaLabels[moduleIndex] = lv_label_create(tile);
-  lv_obj_set_width(ui.moduleMetaLabels[moduleIndex], lv_pct(100));
-  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULES[moduleIndex].meta);
-  lv_label_set_long_mode(ui.moduleMetaLabels[moduleIndex], LV_LABEL_LONG_WRAP);
-  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], &lv_font_montserrat_12);
-  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], UI_COLOR_TEXT_SECONDARY);
+  createStandardModuleCard(tile, moduleIndex, LV_SYMBOL_BATTERY_3, &lv_font_montserrat_20, &lv_font_montserrat_20, &lv_font_montserrat_12, UI_COLOR_TEXT_PRIMARY, UI_COLOR_TEXT_SECONDARY);
 }
 
 static void createWeatherModuleCard(lv_obj_t *tile, int moduleIndex) {
-  createModuleTopRow(tile, moduleIndex);
-  createDashboardSpacer(tile, 8);
-
-  lv_obj_t *heroRow = lv_obj_create(tile);
-  lv_obj_set_width(heroRow, lv_pct(100));
-  lv_obj_set_height(heroRow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(heroRow, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(heroRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(heroRow, 0, 0);
-  lv_obj_set_style_pad_gap(heroRow, 8, 0);
-  lv_obj_set_style_bg_opa(heroRow, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(heroRow, 0, 0);
-  lv_obj_clear_flag(heroRow, LV_OBJ_FLAG_SCROLLABLE);
-
-  ui.moduleIconRefs[moduleIndex] = lv_img_create(heroRow);
-  lv_img_set_src(ui.moduleIconRefs[moduleIndex], &IMG_WEATHER_CLOUD);
-  lv_obj_clear_flag(ui.moduleIconRefs[moduleIndex], LV_OBJ_FLAG_SCROLLABLE);
-
-  ui.moduleValueLabels[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULES[moduleIndex].value);
-  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], UI_COLOR_TEXT_PRIMARY);
-
-  createDashboardSpacer(tile, 8);
-
-  ui.moduleMetaLabels[moduleIndex] = lv_label_create(tile);
-  lv_obj_set_width(ui.moduleMetaLabels[moduleIndex], lv_pct(100));
-  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULES[moduleIndex].meta);
-  lv_label_set_long_mode(ui.moduleMetaLabels[moduleIndex], LV_LABEL_LONG_WRAP);
-  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], &lv_font_montserrat_12);
-  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], UI_COLOR_TEXT_SECONDARY);
+  createStandardModuleCard(tile, moduleIndex, nullptr, nullptr, &lv_font_montserrat_20, &lv_font_montserrat_12, UI_COLOR_TEXT_PRIMARY, UI_COLOR_TEXT_SECONDARY);
 }
 
 static void createNewsModuleCard(lv_obj_t *tile, int moduleIndex) {
-  createModuleTopRow(tile, moduleIndex);
-  createDashboardSpacer(tile, 8);
-
-  lv_obj_t *heroRow = lv_obj_create(tile);
-  lv_obj_set_width(heroRow, lv_pct(100));
-  lv_obj_set_height(heroRow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(heroRow, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(heroRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(heroRow, 0, 0);
-  lv_obj_set_style_pad_gap(heroRow, 8, 0);
-  lv_obj_set_style_bg_opa(heroRow, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(heroRow, 0, 0);
-  lv_obj_clear_flag(heroRow, LV_OBJ_FLAG_SCROLLABLE);
-
-  ui.moduleIconRefs[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleIconRefs[moduleIndex], LV_SYMBOL_BELL);
-  setDashboardLabelFont(ui.moduleIconRefs[moduleIndex], &lv_font_montserrat_16);
-  setDashboardLabelColor(ui.moduleIconRefs[moduleIndex], UI_COLOR_CARD_ICON_SOFT);
-
-  ui.moduleValueLabels[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULES[moduleIndex].value);
-  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], &lv_font_montserrat_14);
-  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], UI_COLOR_ACCENT);
-
-  createDashboardSpacer(tile, 8);
-
-  ui.moduleMetaLabels[moduleIndex] = lv_label_create(tile);
-  lv_obj_set_width(ui.moduleMetaLabels[moduleIndex], lv_pct(100));
-  lv_obj_set_height(ui.moduleMetaLabels[moduleIndex], 48);
-  lv_label_set_long_mode(ui.moduleMetaLabels[moduleIndex], LV_LABEL_LONG_WRAP);
-  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULES[moduleIndex].meta);
-  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], &lv_font_montserrat_14);
-  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], UI_COLOR_TEXT_PRIMARY);
+  createStandardModuleCard(tile, moduleIndex, LV_SYMBOL_BELL, &lv_font_montserrat_16, &lv_font_montserrat_14, &lv_font_montserrat_14, UI_COLOR_ACCENT, UI_COLOR_TEXT_PRIMARY, 48);
 }
 
 static void createSettingsModuleCard(lv_obj_t *tile, int moduleIndex) {
-  createModuleTopRow(tile, moduleIndex);
-  createDashboardSpacer(tile, 8);
-
-  lv_obj_t *heroRow = lv_obj_create(tile);
-  lv_obj_set_width(heroRow, lv_pct(100));
-  lv_obj_set_height(heroRow, LV_SIZE_CONTENT);
-  lv_obj_set_flex_flow(heroRow, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(heroRow, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(heroRow, 0, 0);
-  lv_obj_set_style_pad_gap(heroRow, 10, 0);
-  lv_obj_set_style_bg_opa(heroRow, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(heroRow, 0, 0);
-  lv_obj_clear_flag(heroRow, LV_OBJ_FLAG_SCROLLABLE);
-
-  ui.moduleIconRefs[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleIconRefs[moduleIndex], LV_SYMBOL_SETTINGS);
-  setDashboardLabelFont(ui.moduleIconRefs[moduleIndex], &lv_font_montserrat_20);
-  setDashboardLabelColor(ui.moduleIconRefs[moduleIndex], UI_COLOR_CARD_ICON_SOFT);
-
-  ui.moduleValueLabels[moduleIndex] = lv_label_create(heroRow);
-  lv_label_set_text(ui.moduleValueLabels[moduleIndex], MODULES[moduleIndex].value);
-  setDashboardLabelFont(ui.moduleValueLabels[moduleIndex], &lv_font_montserrat_16);
-  setDashboardLabelColor(ui.moduleValueLabels[moduleIndex], UI_COLOR_TEXT_PRIMARY);
-
-  createDashboardSpacer(tile, 8);
-
-  ui.moduleMetaLabels[moduleIndex] = lv_label_create(tile);
-  lv_obj_set_width(ui.moduleMetaLabels[moduleIndex], lv_pct(100));
-  lv_obj_set_height(ui.moduleMetaLabels[moduleIndex], 52);
-  lv_label_set_long_mode(ui.moduleMetaLabels[moduleIndex], LV_LABEL_LONG_WRAP);
-  lv_label_set_text(ui.moduleMetaLabels[moduleIndex], MODULES[moduleIndex].meta);
-  setDashboardLabelFont(ui.moduleMetaLabels[moduleIndex], &lv_font_montserrat_12);
-  setDashboardLabelColor(ui.moduleMetaLabels[moduleIndex], UI_COLOR_TEXT_SECONDARY);
+  createStandardModuleCard(tile, moduleIndex, LV_SYMBOL_SETTINGS, &lv_font_montserrat_20, &lv_font_montserrat_16, &lv_font_montserrat_12, UI_COLOR_TEXT_PRIMARY, UI_COLOR_TEXT_SECONDARY, 52);
 }
 
 static void createModuleTileContent(lv_obj_t *tile, int moduleIndex) {
@@ -422,24 +336,8 @@ static void createModuleTileContent(lv_obj_t *tile, int moduleIndex) {
   lv_obj_set_style_pad_row(tile, 0, 0);
   lv_obj_set_height(tile, UI_MODULE_TILE_INNER_HEIGHT);
 
-  switch (moduleIndex) {
-    case 0:
-      createSettingsModuleCard(tile, moduleIndex);
-      break;
-    case 1:
-      createClockModuleCard(tile, moduleIndex);
-      break;
-    case 2:
-      createPowerModuleCard(tile, moduleIndex);
-      break;
-    case 3:
-      createWeatherModuleCard(tile, moduleIndex);
-      break;
-    case 4:
-      createNewsModuleCard(tile, moduleIndex);
-      break;
-    default:
-      break;
+  if (moduleIndex >= 0 && moduleIndex < UI_MODULE_COUNT && MODULE_REGISTRY[moduleIndex].createCb) {
+    MODULE_REGISTRY[moduleIndex].createCb(tile, moduleIndex);
   }
 }
 
@@ -692,19 +590,12 @@ void createDashboardMain(lv_obj_t *parent) {
 }
 
 void refreshDashboardMainUi(uint32_t dirtyMask) {
-  updateSettingsModuleCard();
-  if ((dirtyMask & UI_DIRTY_MAIN_CLOCK) != 0) {
-    updateClockModuleCard();
+  for (int i = 0; i < UI_MODULE_COUNT; ++i) {
+    if ((dirtyMask & MODULE_REGISTRY[i].dirtyMask) != 0 && MODULE_REGISTRY[i].updateCb) {
+      MODULE_REGISTRY[i].updateCb();
+    }
   }
-  if ((dirtyMask & UI_DIRTY_MAIN_POWER) != 0) {
-    updatePowerModuleCard();
-  }
-  if ((dirtyMask & UI_DIRTY_MAIN_WEATHER) != 0) {
-    updateWeatherModuleCard();
-  }
-  if ((dirtyMask & UI_DIRTY_MAIN_NEWS) != 0) {
-    updateNewsModuleCard();
-  }
+
   if ((dirtyMask & UI_DIRTY_MAIN_TILE_STATE) != 0) {
     updateModuleTileStates();
     updateModuleDots();

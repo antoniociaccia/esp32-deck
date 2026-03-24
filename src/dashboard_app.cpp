@@ -10,13 +10,7 @@ const char *const DEFAULT_NEWS_ITEMS[NEWS_DEFAULT_ITEM_COUNT] = {
   "WORLD | Prossimo step: news, meteo e batteria"
 };
 
-const ModuleContent MODULES[UI_MODULE_COUNT] = {
-  {"Settings", "Configura", "energia, rete e sistema"},
-  {"Clock", "--:--", "attesa sync NTP"},
-  {"Power", "--", "attesa batteria"},
-  {"Weather", "--", "attesa meteo"},
-  {"News", "--", "attesa feed"}
-};
+
 
 lv_color_t colorFromHex(uint32_t hex) {
   return lv_color_hex(hex);
