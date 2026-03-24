@@ -13,12 +13,11 @@ extern const ModuleContent MODULES[UI_MODULE_COUNT];
 lv_color_t colorFromHex(uint32_t hex);
 bool intervalElapsed(unsigned long &lastRunMs, unsigned long intervalMs);
 
-int extractJsonIntAfterKey(const String &payload, const char *key, int fallbackValue);
-String extractJsonStringAfterKey(const String &payload, const char *key, const char *fallbackValue);
 String decodeJsonString(const String &value);
 void normalizeNewsText(String &text);
 void rebuildNewsTicker();
 void setDefaultNewsItems();
+bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconCodeOut, size_t iconCodeOutSize);
 bool parseNewsItems(const String &payload);
 
 #endif

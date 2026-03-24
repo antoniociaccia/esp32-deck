@@ -31,56 +31,176 @@ bool intervalElapsed(unsigned long &lastRunMs, unsigned long intervalMs) {
   return true;
 }
 
-int extractJsonIntAfterKey(const String &payload, const char *key, int fallbackValue) {
-  int keyIndex = payload.indexOf(key);
-  if (keyIndex < 0) {
-    return fallbackValue;
+static int clampJsonSearchEnd(const String &payload, int searchEnd) {
+  if (searchEnd < 0 || searchEnd > payload.length()) {
+    return payload.length();
   }
+  return searchEnd;
+}
 
+static int findJsonKeyIndex(const String &payload, const char *key, int searchStart, int searchEnd) {
+  int keyIndex = payload.indexOf(key, searchStart);
+  if (keyIndex < 0 || keyIndex >= searchEnd) {
+    return -1;
+  }
+  return keyIndex;
+}
+
+static int findJsonColonAfterKey(const String &payload, int keyIndex, int searchEnd) {
   int colonIndex = payload.indexOf(':', keyIndex);
-  if (colonIndex < 0) {
-    return fallbackValue;
+  if (colonIndex < 0 || colonIndex >= searchEnd) {
+    return -1;
   }
+  return colonIndex;
+}
 
-  int start = colonIndex + 1;
-  while (start < payload.length() && (payload[start] == ' ' || payload[start] == '\"')) {
+static int skipJsonWhitespace(const String &payload, int start, int searchEnd) {
+  while (start < searchEnd) {
+    char c = payload[start];
+    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+      break;
+    }
     start++;
   }
+  return start;
+}
 
+static bool findJsonStringEnd(const String &payload, int startQuote, int searchEnd, int &endQuote) {
+  bool escaped = false;
+  for (int i = startQuote + 1; i < searchEnd; ++i) {
+    char c = payload[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (c == '\\') {
+      escaped = true;
+      continue;
+    }
+    if (c == '\"') {
+      endQuote = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool extractJsonIntAfterKey(const String &payload, const char *key, int &valueOut, int searchStart = 0, int searchEnd = -1) {
+  int boundedEnd = clampJsonSearchEnd(payload, searchEnd);
+  int keyIndex = findJsonKeyIndex(payload, key, searchStart, boundedEnd);
+  if (keyIndex < 0) {
+    return false;
+  }
+
+  int colonIndex = findJsonColonAfterKey(payload, keyIndex, boundedEnd);
+  if (colonIndex < 0) {
+    return false;
+  }
+
+  int start = skipJsonWhitespace(payload, colonIndex + 1, boundedEnd);
   int end = start;
-  while (end < payload.length() && (isDigit(payload[end]) || payload[end] == '-')) {
+  while (end < boundedEnd && (isDigit(payload[end]) || payload[end] == '-')) {
     end++;
   }
 
   if (end <= start) {
-    return fallbackValue;
+    return false;
   }
 
-  return payload.substring(start, end).toInt();
+  valueOut = payload.substring(start, end).toInt();
+  return true;
 }
 
-String extractJsonStringAfterKey(const String &payload, const char *key, const char *fallbackValue) {
-  int keyIndex = payload.indexOf(key);
+static bool extractJsonStringAfterKey(const String &payload, const char *key, String &valueOut, int searchStart = 0, int searchEnd = -1) {
+  int boundedEnd = clampJsonSearchEnd(payload, searchEnd);
+  int keyIndex = findJsonKeyIndex(payload, key, searchStart, boundedEnd);
   if (keyIndex < 0) {
-    return String(fallbackValue);
+    return false;
   }
 
-  int colonIndex = payload.indexOf(':', keyIndex);
+  int colonIndex = findJsonColonAfterKey(payload, keyIndex, boundedEnd);
   if (colonIndex < 0) {
-    return String(fallbackValue);
+    return false;
   }
 
   int startQuote = payload.indexOf('\"', colonIndex + 1);
-  if (startQuote < 0) {
-    return String(fallbackValue);
+  if (startQuote < 0 || startQuote >= boundedEnd) {
+    return false;
   }
 
-  int endQuote = payload.indexOf('\"', startQuote + 1);
-  if (endQuote < 0 || endQuote <= startQuote) {
-    return String(fallbackValue);
+  int endQuote = -1;
+  if (!findJsonStringEnd(payload, startQuote, boundedEnd, endQuote) || endQuote <= startQuote) {
+    return false;
   }
 
-  return payload.substring(startQuote + 1, endQuote);
+  valueOut = payload.substring(startQuote + 1, endQuote);
+  return true;
+}
+
+static bool findJsonRangeAfterKey(
+  const String &payload,
+  const char *key,
+  char openChar,
+  char closeChar,
+  int &rangeStart,
+  int &rangeEnd,
+  int searchStart = 0,
+  int searchEnd = -1) {
+  int boundedEnd = clampJsonSearchEnd(payload, searchEnd);
+  int keyIndex = findJsonKeyIndex(payload, key, searchStart, boundedEnd);
+  if (keyIndex < 0) {
+    return false;
+  }
+
+  int colonIndex = findJsonColonAfterKey(payload, keyIndex, boundedEnd);
+  if (colonIndex < 0) {
+    return false;
+  }
+
+  int start = skipJsonWhitespace(payload, colonIndex + 1, boundedEnd);
+  if (start >= boundedEnd || payload[start] != openChar) {
+    return false;
+  }
+
+  int depth = 0;
+  bool inString = false;
+  bool escaped = false;
+  for (int i = start; i < boundedEnd; ++i) {
+    char c = payload[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (c == '\\') {
+        escaped = true;
+      } else if (c == '\"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (c == '\"') {
+      inString = true;
+      continue;
+    }
+
+    if (c == openChar) {
+      depth++;
+      if (depth == 1) {
+        rangeStart = i + 1;
+      }
+      continue;
+    }
+
+    if (c == closeChar) {
+      depth--;
+      if (depth == 0) {
+        rangeEnd = i;
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 String decodeJsonString(const String &value) {
@@ -139,39 +259,65 @@ void setDefaultNewsItems() {
   rebuildNewsTicker();
 }
 
+bool parseWeatherPayload(const String &payload, int &temperatureOut, char *iconCodeOut, size_t iconCodeOutSize) {
+  int mainStart = 0;
+  int mainEnd = 0;
+  int weatherStart = 0;
+  int weatherEnd = 0;
+  int parsedTemperature = 0;
+  String parsedIconCode;
+
+  if (!findJsonRangeAfterKey(payload, "\"main\"", '{', '}', mainStart, mainEnd)) {
+    return false;
+  }
+  if (!extractJsonIntAfterKey(payload, "\"temp\"", parsedTemperature, mainStart, mainEnd)) {
+    return false;
+  }
+  if (!findJsonRangeAfterKey(payload, "\"weather\"", '[', ']', weatherStart, weatherEnd)) {
+    return false;
+  }
+  if (!extractJsonStringAfterKey(payload, "\"icon\"", parsedIconCode, weatherStart, weatherEnd)) {
+    return false;
+  }
+
+  parsedIconCode.trim();
+  if (parsedIconCode.length() == 0) {
+    return false;
+  }
+
+  temperatureOut = parsedTemperature;
+  strlcpy(iconCodeOut, parsedIconCode.c_str(), iconCodeOutSize);
+  return true;
+}
+
 bool parseNewsItems(const String &payload) {
   int parsedCount = 0;
-  int searchFrom = 0;
+  int itemsStart = 0;
+  int itemsEnd = 0;
+
+  if (!findJsonRangeAfterKey(payload, "\"items\"", '[', ']', itemsStart, itemsEnd)) {
+    return false;
+  }
+
+  int searchFrom = itemsStart;
 
   while (parsedCount < NEWS_MAX_ITEMS) {
-    int textKey = payload.indexOf("\"text\"", searchFrom);
+    int textKey = findJsonKeyIndex(payload, "\"text\"", searchFrom, itemsEnd);
     if (textKey < 0) {
       break;
     }
 
-    int colonIndex = payload.indexOf(':', textKey);
+    int colonIndex = findJsonColonAfterKey(payload, textKey, itemsEnd);
     int startQuote = payload.indexOf('\"', colonIndex + 1);
-    if (colonIndex < 0 || startQuote < 0) {
-      break;
+    if (colonIndex < 0 || startQuote < 0 || startQuote >= itemsEnd) {
+      searchFrom = textKey + 6;
+      continue;
     }
 
-    bool escaped = false;
     int endQuote = -1;
-    for (int i = startQuote + 1; i < payload.length(); ++i) {
-      char c = payload[i];
-      if (c == '\\' && !escaped) {
-        escaped = true;
-        continue;
-      }
-      if (c == '\"' && !escaped) {
-        endQuote = i;
-        break;
-      }
-      escaped = false;
-    }
-
-    if (endQuote < 0) {
-      break;
+    if (!findJsonStringEnd(payload, startQuote, itemsEnd, endQuote)) {
+      searchFrom = startQuote + 1;
+      continue;
     }
 
     String decoded = decodeJsonString(payload.substring(startQuote + 1, endQuote));

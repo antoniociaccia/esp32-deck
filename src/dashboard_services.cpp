@@ -41,6 +41,12 @@ static String buildWeatherUrl() {
   return url;
 }
 
+static void prepareSecureHttpClient(HTTPClient &http, WiFiClientSecure &client) {
+  client.setInsecure();
+  http.setTimeout(NETWORK_HTTP_TIMEOUT_MS);
+  http.setReuse(false);
+}
+
 void updateWeatherUi() {
   unsigned long refreshInterval = app.weatherValid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
   if (!intervalElapsed(app.lastWeatherUpdateMs, refreshInterval)) {
@@ -83,9 +89,8 @@ void updateWeatherUi() {
   }
 
   WiFiClientSecure client;
-  client.setInsecure();
-
   HTTPClient http;
+  prepareSecureHttpClient(http, client);
   if (!http.begin(client, buildWeatherUrl())) {
     app.weatherValid = false;
     app.weatherTemperatureC = 0;
@@ -119,10 +124,24 @@ void updateWeatherUi() {
   String payload = http.getString();
   http.end();
 
-  int temperature = extractJsonIntAfterKey(payload, "\"temp\"", 0);
-  String iconCode = extractJsonStringAfterKey(payload, "\"icon\"", "");
+  int temperature = 0;
+  char iconCode[sizeof(app.weatherIconCode)] = {};
+  if (!parseWeatherPayload(payload, temperature, iconCode, sizeof(iconCode))) {
+    app.weatherValid = false;
+    app.weatherTemperatureC = 0;
+    snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "meteo non valido");
+    strlcpy(app.weatherIconCode, "", sizeof(app.weatherIconCode));
+    if (previousWeatherValid != app.weatherValid
+      || previousWeatherTemperature != app.weatherTemperatureC
+      || strcmp(previousWeatherText, app.weatherLabelText) != 0
+      || strcmp(previousWeatherIconCode, app.weatherIconCode) != 0) {
+      markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
+    }
+    return;
+  }
+
   snprintf(app.weatherLabelText, sizeof(app.weatherLabelText), "%s %dC", WEATHER_CITY_LABEL, temperature);
-  strlcpy(app.weatherIconCode, iconCode.c_str(), sizeof(app.weatherIconCode));
+  strlcpy(app.weatherIconCode, iconCode, sizeof(app.weatherIconCode));
   app.weatherValid = true;
   app.weatherTemperatureC = temperature;
 
@@ -164,9 +183,8 @@ void updateNewsFeed() {
   }
 
   WiFiClientSecure client;
-  client.setInsecure();
-
   HTTPClient http;
+  prepareSecureHttpClient(http, client);
   if (!http.begin(client, NEWS_API_URL)) {
     app.newsValid = false;
     if (previousNewsValid != app.newsValid) {
