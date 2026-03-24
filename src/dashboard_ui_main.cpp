@@ -95,6 +95,9 @@ static void setServiceBadgeFromState(int moduleIndex, ServiceFetchState state) {
     case SERVICE_FETCH_READY:
       setModuleBadge(moduleIndex, "live", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
       break;
+    case SERVICE_FETCH_FETCHING:
+      setModuleBadge(moduleIndex, "fetch", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
+      break;
     case SERVICE_FETCH_OFFLINE:
       setModuleBadge(moduleIndex, "offline", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
       break;
@@ -426,6 +429,9 @@ static void updateWeatherModuleCard() {
   } else {
     strlcpy(valueBuffer, "--", sizeof(valueBuffer));
     switch (app.weather.state) {
+      case SERVICE_FETCH_FETCHING:
+        snprintf(metaBuffer, sizeof(metaBuffer), "%s | scaricamento...", WEATHER_CITY_LABEL);
+        break;
       case SERVICE_FETCH_OFFLINE:
         snprintf(metaBuffer, sizeof(metaBuffer), "%s | Wi-Fi assente", WEATHER_CITY_LABEL);
         break;
@@ -478,6 +484,9 @@ static void updateNewsModuleCard() {
     case SERVICE_FETCH_READY:
       buildNewsPreview(headlineBuffer, sizeof(headlineBuffer));
       break;
+    case SERVICE_FETCH_FETCHING:
+      strlcpy(headlineBuffer, "Recupero ultime notizie...", sizeof(headlineBuffer));
+      break;
     case SERVICE_FETCH_OFFLINE:
       strlcpy(headlineBuffer, "Feed fermo: Wi-Fi non connesso", sizeof(headlineBuffer));
       break;
@@ -514,6 +523,7 @@ static void updateNewsModuleCard() {
     case SERVICE_FETCH_INVALID_PAYLOAD:
       setModuleIconLabel(4, LV_SYMBOL_WARNING, UI_COLOR_ACCENT);
       break;
+    case SERVICE_FETCH_FETCHING:
     case SERVICE_FETCH_TRANSPORT_ERROR:
     case SERVICE_FETCH_IDLE:
     default:

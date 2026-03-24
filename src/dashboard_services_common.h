@@ -4,6 +4,8 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "dashboard_app.h"
+#include "dashboard_ui.h"
+#include "config_debug.h"
 
 void prepareSecureHttpClient(HTTPClient &http, WiFiClientSecure &client);
 
@@ -46,6 +48,12 @@ struct ServiceSnapshot {
       current.lastHttpCode,
       current.valid ? 1 : 0);
     markUiDirty(dirtyMask);
+  }
+
+  void commitAndPumpUi(const char *label) {
+    commitIfChanged(label);
+    refreshDashboardUi();
+    lv_task_handler();
   }
 };
 

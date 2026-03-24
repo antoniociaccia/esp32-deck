@@ -6,6 +6,7 @@
 #include "config_ui.h"
 #include "config_network.h"
 #include "dashboard_ota.h"
+#include <atomic>
 
 struct ModuleCardDef {
   const char *title;
@@ -24,6 +25,7 @@ struct BatteryReading {
 
 enum ServiceFetchState : uint8_t {
   SERVICE_FETCH_IDLE = 0,
+  SERVICE_FETCH_FETCHING,
   SERVICE_FETCH_READY,
   SERVICE_FETCH_OFFLINE,
   SERVICE_FETCH_CONFIG_MISSING,
@@ -120,7 +122,7 @@ struct NewsState {
 
 struct OtaState {
   unsigned long lastCheckMs = 0;
-  bool manifestValid = false;
+  bool valid = false;
   ServiceFetchState state = SERVICE_FETCH_IDLE;
   int lastHttpCode = 0;
   OtaEligibility eligibility = OTA_ELIGIBILITY_INVALID;
@@ -146,7 +148,7 @@ struct AppState {
   OtaState ota;
   int currentModuleIndex = 0;
   unsigned long lastSafeHeartbeatMs = 0;
-  uint32_t uiDirtyMask = UI_DIRTY_ALL;
+  std::atomic<uint32_t> uiDirtyMask{UI_DIRTY_ALL};
 };
 
 extern UiRefs ui;

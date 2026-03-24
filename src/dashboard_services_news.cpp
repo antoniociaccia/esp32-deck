@@ -79,6 +79,9 @@ void updateNewsFeed() {
     return;
   }
 
+  app.news.state = SERVICE_FETCH_FETCHING;
+  snap.commitAndPumpUi("News");
+
   WiFiClientSecure client;
   HTTPClient http;
   prepareSecureHttpClient(http, client);

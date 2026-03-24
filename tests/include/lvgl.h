@@ -14,4 +14,6 @@ inline lv_color_t lv_color_hex(uint32_t hex) {
   return lv_color_t{hex};
 }
 
+uint32_t lv_task_handler(void);
+
 #endif

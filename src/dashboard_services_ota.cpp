@@ -14,7 +14,7 @@
 #include "secrets.h"
 
 static void clearOtaManifestState() {
-  app.ota.manifestValid = false;
+  app.ota.valid = false;
   app.ota.eligibility = OTA_ELIGIBILITY_INVALID;
   app.ota.remoteSizeBytes = 0;
   app.ota.minBatteryPercent = 0;
@@ -48,7 +48,7 @@ void updateOtaManifestCheck() {
     return;
   }
 
-  unsigned long refreshInterval = app.ota.manifestValid ? TIMING_OTA_REFRESH_MS : TIMING_OTA_RETRY_MS;
+  unsigned long refreshInterval = app.ota.valid ? TIMING_OTA_REFRESH_MS : TIMING_OTA_RETRY_MS;
   bool firstCheck = app.ota.state == SERVICE_FETCH_IDLE && app.ota.lastCheckMs == 0;
   bool retryAfterReconnect = app.ota.state == SERVICE_FETCH_OFFLINE && WiFi.status() == WL_CONNECTED;
   if (!firstCheck && !retryAfterReconnect && !intervalElapsed(app.ota.lastCheckMs, refreshInterval)) {
@@ -71,6 +71,9 @@ void updateOtaManifestCheck() {
     snap.commitIfChanged("OTA");
     return;
   }
+
+  app.ota.state = SERVICE_FETCH_FETCHING;
+  snap.commitAndPumpUi("OTA");
 
   WiFiClientSecure client;
   HTTPClient http;
@@ -99,7 +102,7 @@ void updateOtaManifestCheck() {
     return;
   }
 
-  app.ota.manifestValid = true;
+  app.ota.valid = true;
   app.ota.state = SERVICE_FETCH_READY;
   app.ota.lastHttpCode = httpCode;
   app.ota.eligibility = evaluateOtaEligibility(

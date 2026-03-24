@@ -131,5 +131,10 @@ public:
 private:
   std::string value_;
 };
+struct SerialStub {
+  void println(const char * /*msg*/) {}
+  void printf(const char * /*fmt*/, ...) {}
+};
+extern SerialStub Serial;
 
 #endif

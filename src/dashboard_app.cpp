@@ -276,6 +276,8 @@ const char *serviceFetchStateLabel(ServiceFetchState state) {
   switch (state) {
     case SERVICE_FETCH_READY:
       return "ready";
+    case SERVICE_FETCH_FETCHING:
+      return "fetching";
     case SERVICE_FETCH_OFFLINE:
       return "offline";
     case SERVICE_FETCH_CONFIG_MISSING:
@@ -311,6 +313,9 @@ void buildNewsFooterText(char *buffer, size_t bufferSize) {
   switch (app.news.state) {
     case SERVICE_FETCH_IDLE:
       strlcpy(buffer, "NEWS | attesa primo aggiornamento", bufferSize);
+      break;
+    case SERVICE_FETCH_FETCHING:
+      strlcpy(buffer, "NEWS | recupero notizie...", bufferSize);
       break;
     case SERVICE_FETCH_OFFLINE:
       strlcpy(buffer, "NEWS | offline", bufferSize);

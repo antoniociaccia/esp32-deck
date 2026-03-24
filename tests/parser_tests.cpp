@@ -5,6 +5,7 @@
 #include "dashboard_ota.h"
 #include "dashboard_support.h"
 #include "version.h"
+#include "dashboard_services_common.h"
 
 static void testSetDefaultNewsItems() {
   setDefaultNewsItems();
@@ -118,6 +119,20 @@ static void testBuildNewsFooterTextOfflineNoCache() {
   assert(std::strstr(footer, "nessun feed disponibile") != nullptr);
 }
 
+static void testBuildNewsFooterTextFetching() {
+  bool ok = parseNewsItems(String("{\"items\":[{\"text\":\"TECH | Cached titolo\"}]}"));
+  assert(ok);
+  app.news.state = SERVICE_FETCH_FETCHING;
+  app.news.lastHttpCode = 0;
+
+  char footer[NEWS_MAX_TICKER_LEN];
+  buildNewsFooterText(footer, sizeof(footer));
+
+  assert(std::strstr(footer, "recupero notizie...") != nullptr);
+  assert(std::strstr(footer, "cache") != nullptr);
+  assert(std::strstr(footer, "Cached titolo") != nullptr);
+}
+
 static void testParseOtaManifestSuccess() {
   OtaManifest manifest;
   bool ok = parseOtaManifest(
@@ -208,6 +223,35 @@ static void testEvaluateOtaEligibility() {
   assert(std::strcmp(otaEligibilityLabel(OTA_ELIGIBILITY_SLOT_TOO_SMALL), "slot") == 0);
 }
 
+int lvTaskHandlerCalls = 0;
+uint32_t lv_task_handler(void) {
+  lvTaskHandlerCalls++;
+  return 0;
+}
+
+int refreshUiCalls = 0;
+void refreshDashboardUi() {
+  refreshUiCalls++;
+}
+
+static void testCommitAndPumpUi() {
+  app.uiDirtyMask = 0;
+  lvTaskHandlerCalls = 0;
+  refreshUiCalls = 0;
+
+  WeatherState state;
+  state.temperatureC = 20;
+
+  ServiceSnapshot<WeatherState> snap(state, UI_DIRTY_MAIN_WEATHER);
+  state.temperatureC = 25; // Simulate change
+
+  snap.commitAndPumpUi("WeatherTest");
+
+  assert((app.uiDirtyMask.load() & UI_DIRTY_MAIN_WEATHER) != 0);
+  assert(refreshUiCalls == 1);
+  assert(lvTaskHandlerCalls == 1);
+}
+
 int main() {
   testSetDefaultNewsItems();
   testParseWeatherPayloadSuccess();
@@ -218,11 +262,13 @@ int main() {
   testBuildNewsFooterTextReady();
   testBuildNewsFooterTextCachedHttpError();
   testBuildNewsFooterTextOfflineNoCache();
+  testBuildNewsFooterTextFetching();
   testParseOtaManifestSuccess();
   testParseOtaManifestFailure();
   testCompareVersionStrings();
   testIsOtaUpdateAvailable();
   testEvaluateOtaEligibility();
+  testCommitAndPumpUi();
 
   std::puts("parser tests: ok");
   return 0;

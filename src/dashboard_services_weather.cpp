@@ -96,6 +96,9 @@ void updateWeatherUi() {
     return;
   }
 
+  app.weather.state = SERVICE_FETCH_FETCHING;
+  snap.commitAndPumpUi("Weather");
+
   WiFiClientSecure client;
   HTTPClient http;
   prepareSecureHttpClient(http, client);
