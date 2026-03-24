@@ -1,8 +1,8 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-SCRIPT_DIR="${0:A:h}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/flash-common.sh"
 
 FQBN="esp32:esp32:esp32s3"
@@ -111,8 +111,10 @@ ensure_upload_artifacts() {
     exit 1
   fi
 
-  local -a bins
-  bins=("$BUILD_PATH"/*.bin(N))
+  local -a bins=()
+  shopt -s nullglob
+  bins=("$BUILD_PATH"/*.bin)
+  shopt -u nullglob
   if (( ${#bins[@]} == 0 )); then
     echo "Artefatti di build non trovati in $BUILD_PATH"
     echo "Esegui prima ./flash.sh oppure rimuovi --upload-only"

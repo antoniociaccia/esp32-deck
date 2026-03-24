@@ -33,9 +33,9 @@ jobs:
 
       - name: Check shell scripts syntax
         run: |
-          zsh -n flash.sh
-          zsh -n flash-monitor.sh
-          zsh -n flash-common.sh
+          bash -n flash.sh
+          bash -n flash-monitor.sh
+          bash -n flash-common.sh
 
       - name: Check repository docs for local absolute paths
         run: |

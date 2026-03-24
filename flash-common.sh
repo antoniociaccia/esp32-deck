@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 port_exists() {
   local port="${1:-}"
@@ -8,7 +8,7 @@ port_exists() {
 detect_port() {
   local preferred_port="${1:-}"
   local port=""
-  local -a ports
+  local -a ports=()
 
   if port_exists "$preferred_port"; then
     echo "$preferred_port"
@@ -21,15 +21,18 @@ detect_port() {
     return 0
   fi
 
-  ports=(/dev/cu.usbmodem*(N))
+  shopt -s nullglob
+  ports=(/dev/cu.usbmodem*)
   if (( ${#ports[@]} > 0 )); then
-    echo "$ports[1]"
+    shopt -u nullglob
+    echo "${ports[0]}"
     return 0
   fi
 
-  ports=(/dev/tty.usbmodem*(N))
+  ports=(/dev/tty.usbmodem*)
+  shopt -u nullglob
   if (( ${#ports[@]} > 0 )); then
-    echo "$ports[1]"
+    echo "${ports[0]}"
     return 0
   fi
 
