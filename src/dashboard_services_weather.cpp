@@ -9,65 +9,6 @@
 #include <WiFiClientSecure.h>
 #include "secrets.h"
 
-static bool weatherUiStateChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousValid,
-  int previousTemperature,
-  const char *previousWeatherText,
-  const char *previousWeatherIconCode) {
-  return previousState != app.weather.state
-    || previousHttpCode != app.weather.lastHttpCode
-    || previousValid != app.weather.valid
-    || previousTemperature != app.weather.temperatureC
-    || strcmp(previousWeatherText, app.weather.labelText) != 0
-    || strcmp(previousWeatherIconCode, app.weather.iconCode) != 0;
-}
-
-static void markWeatherUiDirtyIfChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousValid,
-  int previousTemperature,
-  const char *previousWeatherText,
-  const char *previousWeatherIconCode) {
-  if (weatherUiStateChanged(
-      previousState,
-      previousHttpCode,
-      previousValid,
-      previousTemperature,
-      previousWeatherText,
-      previousWeatherIconCode)) {
-    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
-  }
-}
-
-static void logWeatherStateIfChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousValid,
-  int previousTemperature,
-  const char *previousWeatherText,
-  const char *previousWeatherIconCode) {
-  if (!weatherUiStateChanged(
-      previousState,
-      previousHttpCode,
-      previousValid,
-      previousTemperature,
-      previousWeatherText,
-      previousWeatherIconCode)) {
-    return;
-  }
-
-  DEBUG_NETWORK_PRINTF(
-    "Weather state=%s http=%d valid=%d temp=%d label='%s'\n",
-    serviceFetchStateLabel(app.weather.state),
-    app.weather.lastHttpCode,
-    app.weather.valid ? 1 : 0,
-    app.weather.temperatureC,
-    app.weather.labelText);
-}
-
 static void setWeatherFetchFailure(ServiceFetchState state, const char *labelText, int httpCode = 0) {
   app.weather.valid = false;
   app.weather.state = state;
@@ -87,13 +28,7 @@ static String buildWeatherUrl() {
   return url;
 }
 
-static bool handleWeatherTestMode(
-  ServiceFetchState previousWeatherState,
-  int previousWeatherHttpCode,
-  bool previousWeatherValid,
-  int previousWeatherTemperature,
-  const char *previousWeatherText,
-  const char *previousWeatherIconCode) {
+static bool handleWeatherTestMode() {
   switch (DEBUG_WEATHER_TEST_MODE) {
     case NETWORK_TEST_MODE_DISABLED:
       return false;
@@ -133,8 +68,6 @@ static bool handleWeatherTestMode(
   }
 
   DEBUG_NETWORK_PRINTF("Weather test mode active: %u\n", DEBUG_WEATHER_TEST_MODE);
-  markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
   return true;
 }
 
@@ -144,35 +77,22 @@ void updateWeatherUi() {
     return;
   }
 
-  char previousWeatherText[sizeof(app.weather.labelText)];
-  char previousWeatherIconCode[sizeof(app.weather.iconCode)];
-  strlcpy(previousWeatherText, app.weather.labelText, sizeof(previousWeatherText));
-  strlcpy(previousWeatherIconCode, app.weather.iconCode, sizeof(previousWeatherIconCode));
-  bool previousWeatherValid = app.weather.valid;
-  ServiceFetchState previousWeatherState = app.weather.state;
-  int previousWeatherHttpCode = app.weather.lastHttpCode;
-  int previousWeatherTemperature = app.weather.temperatureC;
+  ServiceSnapshot<WeatherState> snap(app.weather, UI_DIRTY_HEADER | UI_DIRTY_MAIN_WEATHER);
 
-  if (handleWeatherTestMode(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode)) {
+  if (handleWeatherTestMode()) {
+    snap.commitIfChanged("Weather");
     return;
   }
 
   if (WiFi.status() != WL_CONNECTED) {
     setWeatherFetchFailure(SERVICE_FETCH_OFFLINE, "meteo offline");
-    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+    snap.commitIfChanged("Weather");
     return;
   }
 
   if (strlen(OPENWEATHER_API_KEY) == 0) {
     setWeatherFetchFailure(SERVICE_FETCH_CONFIG_MISSING, "meteo n/d");
-    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+    snap.commitIfChanged("Weather");
     return;
   }
 
@@ -181,10 +101,7 @@ void updateWeatherUi() {
   prepareSecureHttpClient(http, client);
   if (!http.begin(client, buildWeatherUrl())) {
     setWeatherFetchFailure(SERVICE_FETCH_TRANSPORT_ERROR, "meteo rete");
-    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+    snap.commitIfChanged("Weather");
     return;
   }
 
@@ -192,10 +109,7 @@ void updateWeatherUi() {
   if (httpCode != HTTP_CODE_OK) {
     setWeatherFetchFailure(SERVICE_FETCH_HTTP_ERROR, "meteo http", httpCode);
     http.end();
-    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+    snap.commitIfChanged("Weather");
     return;
   }
 
@@ -206,10 +120,7 @@ void updateWeatherUi() {
   char iconCode[sizeof(app.weather.iconCode)] = {};
   if (!parseWeatherPayload(payload, temperature, iconCode, sizeof(iconCode))) {
     setWeatherFetchFailure(SERVICE_FETCH_INVALID_PAYLOAD, "meteo json");
-    logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-    markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-      previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+    snap.commitIfChanged("Weather");
     return;
   }
 
@@ -220,8 +131,5 @@ void updateWeatherUi() {
   app.weather.lastHttpCode = httpCode;
   app.weather.temperatureC = temperature;
 
-  logWeatherStateIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
-  markWeatherUiDirtyIfChanged(previousWeatherState, previousWeatherHttpCode, previousWeatherValid,
-    previousWeatherTemperature, previousWeatherText, previousWeatherIconCode);
+  snap.commitIfChanged("Weather");
 }

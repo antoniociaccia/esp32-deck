@@ -37,65 +37,6 @@ static void pumpOtaUi() {
   delay(1);
 }
 
-static bool otaStateChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousManifestValid,
-  OtaEligibility previousEligibility,
-  uint32_t previousRemoteSizeBytes,
-  int previousMinBatteryPercent,
-  const char *previousRemoteVersion,
-  const char *previousRemoteBuild) {
-  return previousState != app.ota.state
-    || previousHttpCode != app.ota.lastHttpCode
-    || previousManifestValid != app.ota.manifestValid
-    || previousEligibility != app.ota.eligibility
-    || previousRemoteSizeBytes != app.ota.remoteSizeBytes
-    || previousMinBatteryPercent != app.ota.minBatteryPercent
-    || strcmp(previousRemoteVersion, app.ota.remoteVersion) != 0
-    || strcmp(previousRemoteBuild, app.ota.remoteBuild) != 0;
-}
-
-static void logOtaStateIfChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousManifestValid,
-  OtaEligibility previousEligibility,
-  uint32_t previousRemoteSizeBytes,
-  int previousMinBatteryPercent,
-  const char *previousRemoteVersion,
-  const char *previousRemoteBuild) {
-  if (!otaStateChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild)) {
-    return;
-  }
-
-  DEBUG_NETWORK_PRINTF(
-    "OTA state=%s http=%d manifest=%d eligibility=%s version='%s' size=%lu min_battery=%d\n",
-    serviceFetchStateLabel(app.ota.state),
-    app.ota.lastHttpCode,
-    app.ota.manifestValid ? 1 : 0,
-    otaEligibilityLabel(app.ota.eligibility),
-    app.ota.remoteVersion,
-    static_cast<unsigned long>(app.ota.remoteSizeBytes),
-    app.ota.minBatteryPercent);
-}
-
-static void markOtaUiDirtyIfChanged(
-  ServiceFetchState previousState,
-  int previousHttpCode,
-  bool previousManifestValid,
-  OtaEligibility previousEligibility,
-  uint32_t previousRemoteSizeBytes,
-  int previousMinBatteryPercent,
-  const char *previousRemoteVersion,
-  const char *previousRemoteBuild) {
-  if (otaStateChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild)) {
-    markUiDirty(UI_DIRTY_HEADER);
-  }
-}
-
 static void setOtaCheckFailure(ServiceFetchState state, int httpCode = 0) {
   clearOtaManifestState();
   app.ota.state = state;
@@ -117,32 +58,17 @@ void updateOtaManifestCheck() {
     app.ota.lastCheckMs = millis();
   }
 
-  bool previousManifestValid = app.ota.manifestValid;
-  ServiceFetchState previousState = app.ota.state;
-  int previousHttpCode = app.ota.lastHttpCode;
-  OtaEligibility previousEligibility = app.ota.eligibility;
-  uint32_t previousRemoteSizeBytes = app.ota.remoteSizeBytes;
-  int previousMinBatteryPercent = app.ota.minBatteryPercent;
-  char previousRemoteVersion[sizeof(app.ota.remoteVersion)];
-  char previousRemoteBuild[sizeof(app.ota.remoteBuild)];
-  strlcpy(previousRemoteVersion, app.ota.remoteVersion, sizeof(previousRemoteVersion));
-  strlcpy(previousRemoteBuild, app.ota.remoteBuild, sizeof(previousRemoteBuild));
+  ServiceSnapshot<OtaState> snap(app.ota, UI_DIRTY_HEADER);
 
   if (WiFi.status() != WL_CONNECTED) {
     setOtaCheckFailure(SERVICE_FETCH_OFFLINE);
-    logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-    markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+    snap.commitIfChanged("OTA");
     return;
   }
 
   if (strlen(OTA_MANIFEST_URL) == 0) {
     setOtaCheckFailure(SERVICE_FETCH_CONFIG_MISSING);
-    logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-    markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+    snap.commitIfChanged("OTA");
     return;
   }
 
@@ -151,10 +77,7 @@ void updateOtaManifestCheck() {
   prepareSecureHttpClient(http, client);
   if (!http.begin(client, OTA_MANIFEST_URL)) {
     setOtaCheckFailure(SERVICE_FETCH_TRANSPORT_ERROR);
-    logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-    markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+    snap.commitIfChanged("OTA");
     return;
   }
 
@@ -162,10 +85,7 @@ void updateOtaManifestCheck() {
   if (httpCode != HTTP_CODE_OK) {
     setOtaCheckFailure(SERVICE_FETCH_HTTP_ERROR, httpCode);
     http.end();
-    logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-    markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+    snap.commitIfChanged("OTA");
     return;
   }
 
@@ -175,10 +95,7 @@ void updateOtaManifestCheck() {
   OtaManifest manifest;
   if (!parseOtaManifest(payload, manifest)) {
     setOtaCheckFailure(SERVICE_FETCH_INVALID_PAYLOAD, httpCode);
-    logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-    markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-      previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+    snap.commitIfChanged("OTA");
     return;
   }
 
@@ -198,10 +115,7 @@ void updateOtaManifestCheck() {
   strlcpy(app.ota.remoteBuild, manifest.build, sizeof(app.ota.remoteBuild));
   strlcpy(app.ota.remoteBinUrl, manifest.binUrl, sizeof(app.ota.remoteBinUrl));
 
-  logOtaStateIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-    previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
-  markOtaUiDirtyIfChanged(previousState, previousHttpCode, previousManifestValid, previousEligibility,
-    previousRemoteSizeBytes, previousMinBatteryPercent, previousRemoteVersion, previousRemoteBuild);
+  snap.commitIfChanged("OTA");
 }
 
 void requestOtaManifestRefresh() {
