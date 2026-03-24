@@ -46,12 +46,14 @@ void updateWeatherUi() {
 
   if (WiFi.status() != WL_CONNECTED) {
     app.weatherValid = false;
+    app.weatherTemperatureC = 0;
     setWeatherStatus("meteo offline");
     return;
   }
 
   if (strlen(OPENWEATHER_API_KEY) == 0) {
     app.weatherValid = false;
+    app.weatherTemperatureC = 0;
     setWeatherStatus("meteo n/d");
     return;
   }
@@ -62,6 +64,7 @@ void updateWeatherUi() {
   HTTPClient http;
   if (!http.begin(client, buildWeatherUrl())) {
     app.weatherValid = false;
+    app.weatherTemperatureC = 0;
     setWeatherStatus("meteo errore");
     return;
   }
@@ -69,6 +72,7 @@ void updateWeatherUi() {
   int httpCode = http.GET();
   if (httpCode != HTTP_CODE_OK) {
     app.weatherValid = false;
+    app.weatherTemperatureC = 0;
     setWeatherStatus("meteo errore");
     http.end();
     return;
@@ -84,6 +88,7 @@ void updateWeatherUi() {
   setWeatherStatus(weatherBuffer);
   updateWeatherIconUi(iconCode);
   app.weatherValid = true;
+  app.weatherTemperatureC = temperature;
 }
 
 void updateNewsFeed() {

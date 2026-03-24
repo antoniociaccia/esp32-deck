@@ -84,6 +84,8 @@ struct UiRefs {
   lv_obj_t *tileview = nullptr;
   lv_obj_t *moduleTiles[MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleDots[MODULE_COUNT] = {nullptr};
+  lv_obj_t *moduleValueLabels[MODULE_COUNT] = {nullptr};
+  lv_obj_t *moduleMetaLabels[MODULE_COUNT] = {nullptr};
 };
 
 struct AppState {
@@ -97,7 +99,11 @@ struct AppState {
   bool timeSynced = false;
   float filteredBatteryVoltage = 0.0f;
   bool batteryInitialized = false;
+  bool batteryPresent = false;
+  int batteryPercent = -1;
+  float batteryVoltage = 0.0f;
   bool weatherValid = false;
+  int weatherTemperatureC = 0;
   bool newsValid = false;
   int newsItemCount = 0;
   char newsItems[MAX_NEWS_ITEMS][MAX_NEWS_TEXT_LEN] = {};

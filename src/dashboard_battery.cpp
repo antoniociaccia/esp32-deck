@@ -97,6 +97,9 @@ void updateBatteryUi() {
   float measuredVoltage = reading.voltage;
 
   if (!reading.present) {
+    app.batteryPresent = false;
+    app.batteryPercent = -1;
+    app.batteryVoltage = 0.0f;
     setBatteryUiUnavailable();
     return;
   }
@@ -117,5 +120,8 @@ void updateBatteryUi() {
   }
 
   int batteryPercent = batteryPercentFromVoltage(app.filteredBatteryVoltage);
+  app.batteryPresent = true;
+  app.batteryPercent = batteryPercent;
+  app.batteryVoltage = app.filteredBatteryVoltage;
   setBatteryUiValue(app.filteredBatteryVoltage, batteryPercent);
 }

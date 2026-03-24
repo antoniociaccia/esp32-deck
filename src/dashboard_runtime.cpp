@@ -52,5 +52,6 @@ void runDashboardLoop(Display &screen) {
   updateBatteryUi();
   updateWeatherUi();
   updateNewsFeed();
+  updateModuleUi();
   delay(5);
 }

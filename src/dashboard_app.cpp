@@ -10,10 +10,10 @@ const char *const DEFAULT_NEWS_ITEMS[DEFAULT_NEWS_ITEM_COUNT] = {
 };
 
 const ModuleContent MODULES[MODULE_COUNT] = {
-  {"Pomodoro", "24:52", "focus session in corso"},
-  {"Email", "3 nuove", "2 urgenti e 1 follow-up"},
-  {"Meteo", "18C", "Roma, cielo sereno"},
-  {"Touch", "OK", "swipe destra o sinistra"}
+  {"Clock", "--:--", "attesa sync NTP"},
+  {"Power", "--", "attesa batteria"},
+  {"Weather", "--", "attesa meteo"},
+  {"News", "--", "attesa feed"}
 };
 
 lv_color_t colorFromHex(uint32_t hex) {

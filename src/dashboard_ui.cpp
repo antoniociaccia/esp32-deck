@@ -1,6 +1,8 @@
 #include "dashboard_ui.h"
 #include "dashboard_app.h"
+#include <time.h>
 #include <WiFi.h>
+#include "secrets.h"
 #include "weather_icons.h"
 
 static void setLabelFont(lv_obj_t *label, const lv_font_t *font) {
@@ -57,7 +59,92 @@ static void updateModuleDots() {
   }
 }
 
+static void updateClockModuleCard() {
+  if (ui.moduleValueLabels[0] == nullptr || ui.moduleMetaLabels[0] == nullptr) {
+    return;
+  }
+
+  char valueBuffer[24];
+  char metaBuffer[48];
+  struct tm timeinfo;
+  bool hasTime = getLocalTime(&timeinfo, 10);
+
+  if (hasTime) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+  } else {
+    snprintf(valueBuffer, sizeof(valueBuffer), "sync...");
+  }
+
+  snprintf(metaBuffer, sizeof(metaBuffer), "%s | %s",
+    WiFi.status() == WL_CONNECTED ? "wifi ok" : "wifi off",
+    app.timeSynced ? "ntp ok" : "ntp retry");
+
+  lv_label_set_text(ui.moduleValueLabels[0], valueBuffer);
+  lv_label_set_text(ui.moduleMetaLabels[0], metaBuffer);
+}
+
+static void updatePowerModuleCard() {
+  if (ui.moduleValueLabels[1] == nullptr || ui.moduleMetaLabels[1] == nullptr) {
+    return;
+  }
+
+  char valueBuffer[24];
+  char metaBuffer[48];
+
+  if (!app.batteryPresent || app.batteryPercent < 0) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "--");
+    snprintf(metaBuffer, sizeof(metaBuffer), "batteria assente o instabile");
+  } else {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d%%", app.batteryPercent);
+    snprintf(metaBuffer, sizeof(metaBuffer), "%.2fV filtrata", app.batteryVoltage);
+  }
+
+  lv_label_set_text(ui.moduleValueLabels[1], valueBuffer);
+  lv_label_set_text(ui.moduleMetaLabels[1], metaBuffer);
+}
+
+static void updateWeatherModuleCard() {
+  if (ui.moduleValueLabels[2] == nullptr || ui.moduleMetaLabels[2] == nullptr) {
+    return;
+  }
+
+  char valueBuffer[24];
+  char metaBuffer[64];
+
+  if (!app.weatherValid) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "--");
+    snprintf(metaBuffer, sizeof(metaBuffer), "%s | offline o retry", WEATHER_CITY_LABEL);
+  } else {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%dC", app.weatherTemperatureC);
+    snprintf(metaBuffer, sizeof(metaBuffer), "%s | dati live", WEATHER_CITY_LABEL);
+  }
+
+  lv_label_set_text(ui.moduleValueLabels[2], valueBuffer);
+  lv_label_set_text(ui.moduleMetaLabels[2], metaBuffer);
+}
+
+static void updateNewsModuleCard() {
+  if (ui.moduleValueLabels[3] == nullptr || ui.moduleMetaLabels[3] == nullptr) {
+    return;
+  }
+
+  char valueBuffer[24];
+  if (app.newsItemCount > 0) {
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d news", app.newsItemCount);
+  } else {
+    snprintf(valueBuffer, sizeof(valueBuffer), "0 news");
+  }
+
+  const char *headline = app.newsItemCount > 0 ? app.newsItems[0] : "feed non disponibile";
+  lv_label_set_text(ui.moduleValueLabels[3], valueBuffer);
+  lv_label_set_text(ui.moduleMetaLabels[3], headline);
+}
+
 void updateModuleUi() {
+  updateClockModuleCard();
+  updatePowerModuleCard();
+  updateWeatherModuleCard();
+  updateNewsModuleCard();
   updateModuleDots();
 }
 
@@ -260,6 +347,14 @@ static void createModuleTileContent(lv_obj_t *tile, const ModuleContent &module)
   lv_label_set_text(meta, module.meta);
   setLabelFont(meta, &lv_font_montserrat_14);
   setLabelColor(meta, COLOR_TEXT_SECONDARY);
+
+  for (int i = 0; i < MODULE_COUNT; ++i) {
+    if (ui.moduleTiles[i] == tile) {
+      ui.moduleValueLabels[i] = value;
+      ui.moduleMetaLabels[i] = meta;
+      break;
+    }
+  }
 }
 
 static void createMain(lv_obj_t *parent) {
