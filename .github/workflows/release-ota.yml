@@ -32,6 +32,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache Arduino CLI data
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.arduino15
+            /home/runner/Arduino/libraries
+          key: ${{ runner.os }}-arduino-esp32-3.3.7-lvgl-8.4.0-tftespi-2.5.43-${{ hashFiles('lib/TFT_eSPI/User_Setup.h', 'lib/FT6336U_CTP_Controller/library.properties', 'lv_conf.h', '.github/workflows/release-ota.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arduino-esp32-3.3.7-lvgl-8.4.0-tftespi-2.5.43-
+
       - name: Setup arduino-cli
         uses: arduino/setup-arduino-cli@v2
 

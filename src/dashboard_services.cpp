@@ -459,6 +459,7 @@ static void prepareSecureHttpClient(HTTPClient &http, WiFiClientSecure &client) 
   client.setInsecure();
   http.setTimeout(NETWORK_HTTP_TIMEOUT_MS);
   http.setReuse(false);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 }
 
 static bool handleWeatherTestMode(
