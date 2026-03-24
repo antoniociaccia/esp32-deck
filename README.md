@@ -32,6 +32,7 @@ Main libraries:
 - [src/version.h](src/version.h): current firmware version, channel, board id
 - [src/dashboard_ota.h](src/dashboard_ota.h): OTA manifest contract and version comparison helpers
 - [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h): repository-owned display setup for CI and releases
+- [lib/FT6336U_CTP_Controller](lib/FT6336U_CTP_Controller): vendored touch controller library
 - [scripts/build-ota-release.sh](scripts/build-ota-release.sh): OTA release build helper
 - [scripts/release-tag.sh](scripts/release-tag.sh): one-command tag and push helper for OTA releases
 - [assets/weather-icons/](assets/weather-icons): source weather icons
@@ -114,6 +115,10 @@ The board-specific `TFT_eSPI` setup used by this project is now stored in the re
 For local environments you can apply it with:
 
 - `bash ./scripts/apply-tftespi-setup.sh`
+
+The touch controller dependency is also vendored in the repository and can be copied into the Arduino sketchbook libraries with:
+
+- `bash ./scripts/install-repo-libraries.sh`
 
 ## Flash layout
 

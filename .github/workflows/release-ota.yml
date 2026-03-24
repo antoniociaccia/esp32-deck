@@ -42,9 +42,11 @@ jobs:
 
       - name: Install libraries
         run: |
-          arduino-cli lib install "FT6336U CTP Controller@1.0.2"
           arduino-cli lib install "lvgl@8.4.0"
           arduino-cli lib install "TFT_eSPI@2.5.43"
+
+      - name: Install repository libraries
+        run: bash ./scripts/install-repo-libraries.sh
 
       - name: Apply TFT_eSPI setup
         run: bash ./scripts/apply-tftespi-setup.sh

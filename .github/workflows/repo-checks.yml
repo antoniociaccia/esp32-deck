@@ -38,6 +38,7 @@ jobs:
           bash -n flash-common.sh
           bash -n scripts/apply-tftespi-setup.sh
           bash -n scripts/build-ota-release.sh
+          bash -n scripts/install-repo-libraries.sh
           bash -n scripts/release-tag.sh
           bash -n tests/run-parser-tests.sh
 
