@@ -49,11 +49,15 @@ static constexpr float BATTERY_FILTER_ALPHA = 0.15f;
 static constexpr float BATTERY_MAX_STEP_VOLTS = 0.20f;
 static constexpr float BATTERY_EMPTY_VOLTS = 3.30f;
 static constexpr float BATTERY_FULL_VOLTS = 4.20f;
+static constexpr float BATTERY_PRESENT_MIN_VOLTS = 3.20f;
+static constexpr float BATTERY_PRESENT_MAX_VOLTS = 4.35f;
+static constexpr int BATTERY_MAX_STABLE_SPREAD_MV = 180;
 static constexpr unsigned long BATTERY_REFRESH_INTERVAL_MS = 2000;
 static constexpr unsigned long WEATHER_REFRESH_INTERVAL_MS = 1800000;
 static constexpr unsigned long WEATHER_RETRY_INTERVAL_MS = 30000;
 static constexpr unsigned long NEWS_REFRESH_INTERVAL_MS = 900000;
 static constexpr unsigned long NEWS_RETRY_INTERVAL_MS = 60000;
+static constexpr bool SAFE_BOOT_RECOVERY = false;
 
 static const char *DEFAULT_NEWS_ITEMS[] = {
   "IT | Dashboard pronta per dati reali",
@@ -83,6 +87,12 @@ static const ModuleContent MODULES[] = {
 };
 
 static const int MODULE_COUNT = sizeof(MODULES) / sizeof(MODULES[0]);
+
+struct BatteryReading {
+  float voltage;
+  int spreadMilliVolts;
+  bool present;
+};
 
 int extractJsonIntAfterKey(const String &payload, const char *key, int fallbackValue) {
   int keyIndex = payload.indexOf(key);
@@ -360,15 +370,31 @@ int batteryPercentFromVoltage(float voltage) {
   return percent;
 }
 
-float readBatteryVoltage() {
+BatteryReading readBatteryVoltage() {
   uint32_t totalMilliVolts = 0;
+  int minMilliVolts = 1000000;
+  int maxMilliVolts = 0;
+
   for (int i = 0; i < BATTERY_SAMPLE_COUNT; ++i) {
-    totalMilliVolts += analogReadMilliVolts(BAT_PIN);
+    int milliVolts = analogReadMilliVolts(BAT_PIN);
+    totalMilliVolts += milliVolts;
+    if (milliVolts < minMilliVolts) {
+      minMilliVolts = milliVolts;
+    }
+    if (milliVolts > maxMilliVolts) {
+      maxMilliVolts = milliVolts;
+    }
     delay(2);
   }
 
   float averageMilliVolts = totalMilliVolts / (float)BATTERY_SAMPLE_COUNT;
-  return (averageMilliVolts / 1000.0f) * BATTERY_DIVIDER_RATIO * BATTERY_CALIBRATION_FACTOR;
+  float voltage = (averageMilliVolts / 1000.0f) * BATTERY_DIVIDER_RATIO * BATTERY_CALIBRATION_FACTOR;
+  int spreadMilliVolts = maxMilliVolts - minMilliVolts;
+  bool present = voltage >= BATTERY_PRESENT_MIN_VOLTS &&
+    voltage <= BATTERY_PRESENT_MAX_VOLTS &&
+    spreadMilliVolts <= BATTERY_MAX_STABLE_SPREAD_MV;
+
+  return { voltage, spreadMilliVolts, present };
 }
 
 void initBatteryMonitoring() {
@@ -382,7 +408,24 @@ void updateBatteryUi() {
 
   lastBatteryUpdateMs = millis();
 
-  float measuredVoltage = readBatteryVoltage();
+  BatteryReading reading = readBatteryVoltage();
+  float measuredVoltage = reading.voltage;
+
+  if (!reading.present) {
+    batteryInitialized = false;
+    lv_label_set_text(batteryPercentLabel, "--");
+    lv_label_set_text(batteryVoltageLabel, "--.--V");
+    lv_label_set_text(batteryIconLabel, LV_SYMBOL_BATTERY_EMPTY);
+    setLabelColor(batteryPercentLabel, lv_color_hex(0x94A3B8));
+    setLabelColor(batteryVoltageLabel, lv_color_hex(0x94A3B8));
+    setLabelColor(batteryIconLabel, lv_color_hex(0x94A3B8));
+    return;
+  }
+
+  setLabelColor(batteryPercentLabel, lv_color_hex(0xC7F9CC));
+  setLabelColor(batteryVoltageLabel, lv_color_hex(0xC7F9CC));
+  setLabelColor(batteryIconLabel, lv_color_hex(0xC7F9CC));
+
   if (!batteryInitialized) {
     filteredBatteryVoltage = measuredVoltage;
     batteryInitialized = true;
@@ -815,10 +858,32 @@ void createDashboardUi() {
 
 void setup() {
   Serial.begin(115200);
+  delay(250);
+  Serial.println();
+  Serial.println("[boot] serial ready");
+
+  if (SAFE_BOOT_RECOVERY) {
+    screen.init();
+    lv_obj_t *root = lv_scr_act();
+    lv_obj_set_style_bg_color(root, lv_color_hex(0x101418), 0);
+    lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+
+    lv_obj_t *label = lv_label_create(root);
+    lv_label_set_text(label, "SAFE LVGL");
+    lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_center(label);
+
+    Serial.println("[boot] safe mode active");
+    Serial.println("[boot] screen.init ok");
+    return;
+  }
 
   screen.init();
+  Serial.println("[boot] display init ok");
   setDefaultNewsItems();
   createDashboardUi();
+  Serial.println("[boot] ui ok");
   initBatteryMonitoring();
   beginTimeSync();
 
@@ -827,6 +892,16 @@ void setup() {
 }
 
 void loop() {
+  if (SAFE_BOOT_RECOVERY) {
+    static unsigned long lastHeartbeatMs = 0;
+    if (millis() - lastHeartbeatMs >= 2000) {
+      lastHeartbeatMs = millis();
+      Serial.printf("[safe] alive %lus\n", millis() / 1000UL);
+    }
+    delay(5);
+    return;
+  }
+
   screen.routine();
   maintainTimeSync();
   updateClockUi();

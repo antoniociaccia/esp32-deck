@@ -3,12 +3,12 @@
 set -euo pipefail
 
 FQBN="esp32:esp32:esp32s3"
-PORT="/dev/cu.usbmodem14401"
 BUILD_PATH="/tmp/arduino-news-build"
 BUILD_LOG="/tmp/arduino-news-build.log"
-SOURCE_MANIFEST="$BUILD_PATH/.source-manifest"
 APP_MAX_BYTES="4063232"
+CDC_ON_BOOT="1"
 CLEAN_BUILD=0
+PORT_WAIT_SECONDS=5
 
 if [[ "${1:-}" == "--clean" ]]; then
   CLEAN_BUILD=1
@@ -29,31 +29,44 @@ render_bar() {
   printf "%-5s [%s] %3d%%\n" "$label" "$bar" "$percent"
 }
 
+detect_port() {
+  local port=""
+  local -a ports
+
+  port=$(arduino-cli board list | awk '/ESP32-S3|esp32s3/ {print $1; exit}')
+  if [[ -n "$port" ]]; then
+    echo "$port"
+    return 0
+  fi
+
+  ports=(/dev/cu.usbmodem*(N))
+  if (( ${#ports[@]} > 0 )); then
+    echo "$ports[1]"
+    return 0
+  fi
+
+  ports=(/dev/tty.usbmodem*(N))
+  if (( ${#ports[@]} > 0 )); then
+    echo "$ports[1]"
+    return 0
+  fi
+
+  return 1
+}
+
 echo "Compilo lo sketch..."
 mkdir -p "$BUILD_PATH"
-
-CURRENT_MANIFEST=$(find . -maxdepth 1 \( -name '*.ino' -o -name '*.c' -o -name '*.cpp' -o -name '*.h' \) | sort)
-PREVIOUS_MANIFEST=""
-if [[ -f "$SOURCE_MANIFEST" ]]; then
-  PREVIOUS_MANIFEST="$(cat "$SOURCE_MANIFEST")"
-fi
-
-if [[ "$CURRENT_MANIFEST" != "$PREVIOUS_MANIFEST" ]]; then
-  echo "Sorgenti cambiati: pulizia build cache..."
-  CLEAN_BUILD=1
-fi
 
 if [[ "$CLEAN_BUILD" -eq 1 ]]; then
   echo "Pulizia build cache..."
   rm -rf "$BUILD_PATH"
   mkdir -p "$BUILD_PATH"
 fi
-
-printf "%s\n" "$CURRENT_MANIFEST" > "$SOURCE_MANIFEST"
 arduino-cli compile \
   --fqbn "$FQBN" \
   --build-path "$BUILD_PATH" \
   --build-property "upload.maximum_size=$APP_MAX_BYTES" \
+  --build-property "build.cdc_on_boot=$CDC_ON_BOOT" \
   . | tee "$BUILD_LOG"
 
 FLASH_LINE=$(grep -E "Sketch uses|Lo sketch usa" "$BUILD_LOG" | head -n 1 || true)
@@ -88,6 +101,24 @@ fi
 if [ -n "$RAM_LINE" ]; then
   printf "RAM: %.2f MB / %.2f MB\n" "$(awk "BEGIN {print $RAM_BYTES/1000000}")" "$(awk "BEGIN {print $RAM_MAX_BYTES/1000000}")"
   render_bar "$RAM_BYTES" "$RAM_MAX_BYTES" "RAM"
+fi
+
+PORT="$(detect_port || true)"
+if [[ -z "$PORT" ]]; then
+  echo "Attendo la porta seriale per ${PORT_WAIT_SECONDS}s..."
+  for _ in $(seq 1 "$PORT_WAIT_SECONDS"); do
+    sleep 1
+    PORT="$(detect_port || true)"
+    if [[ -n "$PORT" ]]; then
+      break
+    fi
+  done
+fi
+
+if [[ -z "$PORT" ]]; then
+  echo "Porta seriale non trovata."
+  echo "Controlla con: arduino-cli board list"
+  exit 1
 fi
 
 echo "Carico sulla scheda $PORT..."

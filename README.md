@@ -64,9 +64,10 @@ Comandi principali:
 
 Note su `flash.sh`:
 - usa cache incrementale
-- pulisce automaticamente la build se cambia l’elenco dei sorgenti
+- pulisce la build solo con `--clean`
 - mostra barra percentuale per flash e RAM
 - forza `upload.maximum_size` coerente con la partizione app reale
+- forza `build.cdc_on_boot=1` per tenere disponibile la seriale USB runtime su ESP32-S3
 
 ## Partizioni
 
@@ -128,6 +129,10 @@ La base hardware è stabile:
 - touch ok
 - LVGL ok
 - Wi-Fi ok
+
+Nota:
+- il safe recovery usato per la diagnosi USB/TFT è stato disattivato
+- il firmware torna ora al percorso completo del dashboard
 
 Le prossime iterazioni sono concentrate su:
 - rifinitura UI
