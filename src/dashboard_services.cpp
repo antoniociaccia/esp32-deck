@@ -383,10 +383,6 @@ void requestOtaManifestRefresh() {
 }
 
 void startOtaFirmwareUpdate() {
-  if (app.otaApplyState == OTA_APPLY_IN_PROGRESS) {
-    return;
-  }
-
   app.otaApplyRequested = false;
 
   if (WiFi.status() != WL_CONNECTED) {
