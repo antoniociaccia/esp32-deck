@@ -132,6 +132,10 @@ main() {
   rm -rf "$BUILD_ROOT"
   mkdir -p "$BUILD_ROOT"
 
+  bash "$REPO_DIR/scripts/install-lvgl-config.sh"
+  bash "$REPO_DIR/scripts/install-repo-libraries.sh"
+  bash "$REPO_DIR/scripts/apply-tftespi-setup.sh"
+
   copy_repo_to_temp_sketch
   write_stub_secrets
 

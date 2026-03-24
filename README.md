@@ -115,6 +115,7 @@ The board-specific `TFT_eSPI` setup used by this project is now stored in the re
 For local environments you can apply it with:
 
 - `bash ./scripts/apply-tftespi-setup.sh`
+- `bash ./scripts/install-lvgl-config.sh`
 
 The touch controller dependency is also vendored in the repository and can be copied into the Arduino sketchbook libraries with:
 

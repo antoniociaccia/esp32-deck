@@ -5,7 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE_SETUP="$REPO_DIR/lib/TFT_eSPI/User_Setup.h"
-ARDUINO_LIBRARY_DIR="${ARDUINO_LIBRARY_DIR:-$HOME/Arduino/libraries}"
+DEFAULT_ARDUINO_LIBRARY_DIR="$HOME/Documents/Arduino/libraries"
+if [[ ! -d "$DEFAULT_ARDUINO_LIBRARY_DIR" ]]; then
+  DEFAULT_ARDUINO_LIBRARY_DIR="$HOME/Arduino/libraries"
+fi
+ARDUINO_LIBRARY_DIR="${ARDUINO_LIBRARY_DIR:-$DEFAULT_ARDUINO_LIBRARY_DIR}"
 TARGET_SETUP="$ARDUINO_LIBRARY_DIR/TFT_eSPI/User_Setup.h"
 
 if [[ ! -f "$SOURCE_SETUP" ]]; then

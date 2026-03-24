@@ -5,6 +5,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/flash-common.sh"
 
+bash "$SCRIPT_DIR/scripts/install-lvgl-config.sh"
+bash "$SCRIPT_DIR/scripts/install-repo-libraries.sh"
+bash "$SCRIPT_DIR/scripts/apply-tftespi-setup.sh"
+
 FQBN="esp32:esp32:esp32s3"
 CDC_ON_BOOT="1"
 BUILD_JOBS="0"

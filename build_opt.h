@@ -1,1 +1,0 @@
--DLV_CONF_PATH=/Users/antoniociaccia/Documents/Arduino/news/lv_conf.h

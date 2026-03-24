@@ -4,7 +4,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ARDUINO_LIBRARY_DIR="${ARDUINO_LIBRARY_DIR:-$HOME/Arduino/libraries}"
+DEFAULT_ARDUINO_LIBRARY_DIR="$HOME/Documents/Arduino/libraries"
+if [[ ! -d "$DEFAULT_ARDUINO_LIBRARY_DIR" ]]; then
+  DEFAULT_ARDUINO_LIBRARY_DIR="$HOME/Arduino/libraries"
+fi
+ARDUINO_LIBRARY_DIR="${ARDUINO_LIBRARY_DIR:-$DEFAULT_ARDUINO_LIBRARY_DIR}"
 
 mkdir -p "$ARDUINO_LIBRARY_DIR"
 

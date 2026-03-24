@@ -48,6 +48,9 @@ jobs:
       - name: Install repository libraries
         run: bash ./scripts/install-repo-libraries.sh
 
+      - name: Install LVGL config
+        run: bash ./scripts/install-lvgl-config.sh
+
       - name: Apply TFT_eSPI setup
         run: bash ./scripts/apply-tftespi-setup.sh
 
