@@ -33,6 +33,7 @@ Main libraries:
 - [src/dashboard_ota.h](src/dashboard_ota.h): OTA manifest contract and version comparison helpers
 - [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h): repository-owned display setup for CI and releases
 - [scripts/build-ota-release.sh](scripts/build-ota-release.sh): OTA release build helper
+- [scripts/release-tag.sh](scripts/release-tag.sh): one-command tag and push helper for OTA releases
 - [assets/weather-icons/](assets/weather-icons): source weather icons
 - [flash.sh](flash.sh): compile and upload helper
 - [flash-monitor.sh](flash-monitor.sh): upload and serial monitor helper
@@ -74,6 +75,7 @@ Useful commands:
 - `./flash.sh --ota-layout --build-only`
 - `./flash.sh --port /dev/cu.usbmodem14301`
 - `./flash-monitor.sh`
+- `bash ./scripts/release-tag.sh`
 
 Notes:
 
@@ -134,6 +136,13 @@ The repository now includes the OTA groundwork and the first end-to-end GitHub r
 - [.github/workflows/release-ota.yml](.github/workflows/release-ota.yml) builds OTA release assets on Git tags and publishes:
   - a versioned firmware binary such as `esp32-deck-esp32s3-v0.1.0.bin`
   - a stable manifest asset `manifest-stable.json`
+
+Release flow:
+
+1. update [src/version.h](src/version.h)
+2. commit and push `main`
+3. trigger `Release OTA` from GitHub Actions (`workflow_dispatch`) or run `bash ./scripts/release-tag.sh`
+4. wait for `Release OTA` in GitHub Actions
 
 ## External APIs
 
