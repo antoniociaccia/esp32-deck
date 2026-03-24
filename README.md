@@ -25,12 +25,23 @@ Stack usato:
 
 ## File Principali
 
-- [`news.ino`](/Users/antoniociaccia/Documents/Arduino/news/news.ino): logica principale dashboard, UI, Wi-Fi, NTP, batteria, meteo, news
-- [`display.h`](/Users/antoniociaccia/Documents/Arduino/news/display.h): interfaccia display/touch
-- [`display.cpp`](/Users/antoniociaccia/Documents/Arduino/news/display.cpp): bridge `LVGL + TFT_eSPI + touch`
+Struttura:
+- root: sketch Arduino, script, config e documentazione
+- `src/`: logica C++ del progetto
+- `assets/`: asset SVG e conversioni `LVGL`
+
+- [`news.ino`](/Users/antoniociaccia/Documents/Arduino/news/news.ino): entrypoint Arduino con `setup()` e `loop()`
+- [`dashboard_app.h`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_app.h): tipi condivisi, costanti globali e stato app/UI
+- [`dashboard_app.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_app.cpp): parser JSON leggero, ticker news e helper condivisi
+- [`dashboard_ui.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_ui.cpp): costruzione dashboard `LVGL` e aggiornamenti UI
+- [`dashboard_battery.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_battery.cpp): lettura ADC, filtro e logica batteria
+- [`dashboard_services.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_services.cpp): Wi-Fi, NTP, meteo e fetch news
+- [`dashboard_runtime.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_runtime.cpp): bootstrap dashboard e ciclo runtime
+- [`display.h`](/Users/antoniociaccia/Documents/Arduino/news/src/display.h): interfaccia display/touch
+- [`display.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/display.cpp): bridge `LVGL + TFT_eSPI + touch`
 - [`lv_conf.h`](/Users/antoniociaccia/Documents/Arduino/news/lv_conf.h): configurazione locale `LVGL`
-- [`weather_icons.h`](/Users/antoniociaccia/Documents/Arduino/news/weather_icons.h): dichiarazioni asset meteo
-- [`weather_icons.c`](/Users/antoniociaccia/Documents/Arduino/news/weather_icons.c): inclusione asset meteo generati da `LVGL Image Converter`
+- [`weather_icons.h`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.h): dichiarazioni asset meteo
+- [`weather_icons.c`](/Users/antoniociaccia/Documents/Arduino/news/src/weather_icons.c): inclusione asset meteo generati da `LVGL Image Converter`
 - [`partitions.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions.csv): layout flash single-app senza dual OTA
 - [`flash.sh`](/Users/antoniociaccia/Documents/Arduino/news/flash.sh): compile + upload
 - [`flash-monitor.sh`](/Users/antoniociaccia/Documents/Arduino/news/flash-monitor.sh): upload + monitor seriale
