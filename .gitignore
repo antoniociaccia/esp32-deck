@@ -15,6 +15,8 @@ build/
 # Local environment files
 sketch.yaml
 secrets.h
+AGENTS.md
+n8n-news-workflow.json
 
 # Doc
 
