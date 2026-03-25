@@ -15,7 +15,7 @@ BUILD_JOBS="0"
 PORT_WAIT_SECONDS=5
 DEFAULT_PARTITIONS_FILE="$SCRIPT_DIR/partitions.csv"
 OTA_PARTITIONS_FILE="$SCRIPT_DIR/partitions_ota.csv"
-PARTITIONS_FILE="$DEFAULT_PARTITIONS_FILE"
+PARTITIONS_FILE="$OTA_PARTITIONS_FILE"
 BUILD_PATH_BASE="/tmp/arduino-news-build"
 BUILD_PATH="$BUILD_PATH_BASE"
 BUILD_LOG="${BUILD_PATH_BASE}.log"
@@ -31,13 +31,13 @@ PORT_OVERRIDE=""
 usage() {
   cat <<'EOF'
 Uso:
-  ./flash.sh [--clean] [--build-only] [--upload-only] [--ota-layout] [--partitions-file file.csv] [--port /dev/...] [--jobs N]
+  ./flash.sh [--clean] [--build-only] [--upload-only] [--factory-layout] [--partitions-file file.csv] [--port /dev/...] [--jobs N]
 
 Opzioni:
   --clean         pulisce la cache di build prima della compilazione
   --build-only    compila senza fare upload
   --upload-only   salta la compilazione e riusa gli artefatti gia presenti
-  --ota-layout    usa il layout OTA in partitions_ota.csv
+  --factory-layout usa il layout legacy in partitions.csv
   --partitions-file PATH
                   usa un file partizioni alternativo per compile e upload
   --port PATH     forza la porta seriale
@@ -260,8 +260,8 @@ while (( $# > 0 )); do
     --build-only)
       BUILD_ONLY=1
       ;;
-    --ota-layout)
-      PARTITIONS_FILE="$OTA_PARTITIONS_FILE"
+    --factory-layout)
+      PARTITIONS_FILE="$DEFAULT_PARTITIONS_FILE"
       ;;
     --partitions-file)
       shift

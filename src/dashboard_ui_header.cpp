@@ -201,7 +201,8 @@ static void refreshOtaHeaderUi() {
   }
 
   bool otaVisible = DEBUG_OTA_BUTTON_ALWAYS_VISIBLE
-    || (app.ota.state == SERVICE_FETCH_READY && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE);
+    || (app.ota.state == SERVICE_FETCH_READY && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE)
+    || (app.ota.applyState != OTA_APPLY_IDLE);
   if (otaVisible) {
     lv_obj_clear_flag(ui.otaButton, LV_OBJ_FLAG_HIDDEN);
   } else {

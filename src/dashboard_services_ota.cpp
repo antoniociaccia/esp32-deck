@@ -167,6 +167,13 @@ void startOtaFirmwareUpdate() {
   app.ota.applyBytesTotal = 0;
   pumpOtaUi();
 
+  if (app.ota.remoteSha256[0] != '\0') {
+    DEBUG_NETWORK_PRINTF("[OTA] Checksum SHA256 target: %s\n", app.ota.remoteSha256);
+    DEBUG_NETWORK_PRINT("[OTA] Nota: HTTPUpdate non fa validazione SHA256 post-flash. Validazione omessa in questa versione.");
+  } else {
+    DEBUG_NETWORK_PRINT("[OTA] Checksum SHA256 target mancante nel manifest.");
+  }
+
   WiFiClientSecure client;
   client.setInsecure();
 

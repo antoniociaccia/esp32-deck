@@ -34,7 +34,7 @@ static constexpr uint8_t DEBUG_WEATHER_TEST_MODE = NETWORK_TEST_MODE_DISABLED;
 static constexpr uint8_t DEBUG_NEWS_TEST_MODE = NETWORK_TEST_MODE_DISABLED;
 static constexpr int DEBUG_WEATHER_TEST_HTTP_CODE = 503;
 static constexpr int DEBUG_NEWS_TEST_HTTP_CODE = 503;
-static constexpr bool DEBUG_OTA_BUTTON_ALWAYS_VISIBLE = true;
+static constexpr bool DEBUG_OTA_BUTTON_ALWAYS_VISIBLE = false;
 
 #define DEBUG_SHOULD_LOG(level, enabled) (DEBUG_SERIAL_ENABLED && (enabled) && ((level) <= DEBUG_SERIAL_LEVEL))
 
