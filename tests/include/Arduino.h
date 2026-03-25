@@ -161,4 +161,9 @@ inline bool getLocalTime(struct tm *info, uint32_t /*ms*/ = 5000) {
 
 inline void configTzTime(const char* /*tz*/, const char* /*server1*/, const char* /*server2*/) {}
 
+inline int analogReadMilliVolts(int /*pin*/) { return 0; }
+inline void delay(unsigned long /*ms*/) {}
+inline void analogSetPinAttenuation(int /*pin*/, int /*atten*/) {}
+static constexpr int ADC_11db = 3;
+
 #endif

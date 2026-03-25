@@ -31,11 +31,14 @@ c++ \
   "$REPO_DIR/tests/test_ui.cpp" \
   "$REPO_DIR/tests/test_network.cpp" \
   "$REPO_DIR/tests/test_services.cpp" \
+  "$REPO_DIR/tests/test_utils.cpp" \
+  "$REPO_DIR/tests/test_battery.cpp" \
   "$REPO_DIR/src/dashboard_app.cpp" \
   "$REPO_DIR/src/dashboard_ota.cpp" \
   "$REPO_DIR/src/dashboard_services_weather.cpp" \
   "$REPO_DIR/src/dashboard_services_news.cpp" \
   "$REPO_DIR/src/dashboard_services.cpp" \
+  "$REPO_DIR/src/dashboard_battery.cpp" \
   -o "$BIN_PATH"
 
 "$BIN_PATH"

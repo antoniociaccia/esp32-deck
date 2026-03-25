@@ -3,5 +3,6 @@
 
 void initBatteryMonitoring();
 void updateBatteryUi();
+int batteryPercentFromVoltage(float voltage);
 
 #endif

@@ -25,7 +25,7 @@ static float interpolateSegment(float voltage, float v1, float p1, float v2, flo
   return p1 + (ratio * (p2 - p1));
 }
 
-static int batteryPercentFromVoltage(float voltage) {
+int batteryPercentFromVoltage(float voltage) {
   float clamped = clampBatteryVoltage(voltage);
 
   // Piecewise LiPo approximation for a 1-cell battery under light load.
