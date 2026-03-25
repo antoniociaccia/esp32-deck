@@ -8,10 +8,11 @@
 #include "config_timing.h"
 #include "version.h"
 #include <HTTPClient.h>
-#include <HTTPUpdate.h>
+#include <Update.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include "secrets.h"
+#include "mbedtls/sha256.h"
 
 static void clearOtaManifestState() {
   app.ota.valid = false;
@@ -162,99 +163,151 @@ void startOtaFirmwareUpdate() {
     return;
   }
 
-  setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Preparazione OTA...");
+  setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Connessione al server OTA...");
   app.ota.applyBytesCurrent = 0;
   app.ota.applyBytesTotal = 0;
   pumpOtaUi();
 
-  if (app.ota.remoteSha256[0] != '\0') {
-    DEBUG_NETWORK_PRINTF("[OTA] Checksum SHA256 target: %s\n", app.ota.remoteSha256);
-    DEBUG_NETWORK_PRINT("[OTA] Nota: HTTPUpdate non fa validazione SHA256 post-flash. Validazione omessa in questa versione.");
-  } else {
-    DEBUG_NETWORK_PRINT("[OTA] Checksum SHA256 target mancante nel manifest.");
-  }
-
   WiFiClientSecure client;
   client.setInsecure();
 
-  HTTPUpdate updater(NETWORK_OTA_DOWNLOAD_TIMEOUT_MS);
-  updater.rebootOnUpdate(false);
-  updater.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  HTTPClient http;
+  http.setTimeout(NETWORK_OTA_DOWNLOAD_TIMEOUT_MS);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
-  updater.onStart([]() {
-    setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Download firmware...");
-    app.ota.applyBytesCurrent = 0;
-    app.ota.applyBytesTotal = 0;
+  if (!http.begin(client, String(app.ota.remoteBinUrl))) {
+    setOtaApplyState(OTA_APPLY_FAILED, -1, 0, "Connessione al server OTA fallita.");
     pumpOtaUi();
-  });
+    return;
+  }
 
-  updater.onProgress([](int current, int total) {
-    int percent = -1;
-    if (total > 0) {
-      percent = (current * 100) / total;
-    }
-
-    app.ota.applyBytesCurrent = current > 0 ? static_cast<uint32_t>(current) : 0;
-    app.ota.applyBytesTotal = total > 0 ? static_cast<uint32_t>(total) : 0;
-
-    char statusText[96];
-    if (total > 0) {
-      snprintf(
-        statusText,
-        sizeof(statusText),
-        "Download firmware... %d%% (%lu/%lu KB)",
-        percent,
-        static_cast<unsigned long>(app.ota.applyBytesCurrent / 1024UL),
-        static_cast<unsigned long>(app.ota.applyBytesTotal / 1024UL));
-    } else {
-      snprintf(
-        statusText,
-        sizeof(statusText),
-        "Download firmware... %lu KB",
-        static_cast<unsigned long>(app.ota.applyBytesCurrent / 1024UL));
-    }
-    setOtaApplyState(OTA_APPLY_IN_PROGRESS, percent, 0, statusText);
-    pumpOtaUi();
-  });
-
-  updater.onEnd([]() {
-    setOtaApplyState(OTA_APPLY_SUCCESS, 100, 0, "Update installato. Riavvio...");
-    app.ota.applyBytesCurrent = app.ota.applyBytesTotal;
-    pumpOtaUi();
-  });
-
-  updater.onError([](int errorCode) {
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) {
     char statusText[64];
-    snprintf(statusText, sizeof(statusText), "Errore OTA (%d).", errorCode);
-    setOtaApplyState(OTA_APPLY_FAILED, -1, errorCode, statusText);
+    snprintf(statusText, sizeof(statusText), "Errore HTTP OTA: %d.", httpCode);
+    setOtaApplyState(OTA_APPLY_FAILED, -1, httpCode, statusText);
+    http.end();
     pumpOtaUi();
-  });
-
-  HTTPUpdateResult result = updater.update(client, String(app.ota.remoteBinUrl), String(FW_VERSION));
-  if (result == HTTP_UPDATE_OK) {
-    setOtaApplyState(OTA_APPLY_SUCCESS, 100, 0, "Update installato. Riavvio...");
-    app.ota.applyBytesCurrent = app.ota.applyBytesTotal;
-    pumpOtaUi();
-    delay(500);
-    ESP.restart();
     return;
   }
 
-  if (result == HTTP_UPDATE_NO_UPDATES) {
-    DEBUG_NETWORK_PRINT("[OTA] HTTPUpdate: NO_UPDATES — version match o x-MD5 mismatch");
-    app.ota.eligibility = OTA_ELIGIBILITY_UP_TO_DATE;
-    setOtaApplyState(OTA_APPLY_IDLE, -1, 0, "");
-    markUiDirty(UI_DIRTY_HEADER);
+  int contentLength = http.getSize();
+  Stream *stream = http.getStreamPtr();
+
+  if (!Update.begin(contentLength > 0 ? (size_t)contentLength : UPDATE_SIZE_UNKNOWN)) {
+    char statusText[64];
+    snprintf(statusText, sizeof(statusText), "Errore avvio flash (%d).", (int)Update.getError());
+    setOtaApplyState(OTA_APPLY_FAILED, -1, (int)Update.getError(), statusText);
+    http.end();
+    pumpOtaUi();
     return;
   }
 
-  String errorText = updater.getLastErrorString();
-  char statusText[96];
-  if (errorText.length() > 0) {
-    snprintf(statusText, sizeof(statusText), "Errore OTA (%d): %s", updater.getLastError(), errorText.c_str());
-  } else {
-    snprintf(statusText, sizeof(statusText), "Errore OTA (%d).", updater.getLastError());
-  }
-  setOtaApplyState(OTA_APPLY_FAILED, -1, updater.getLastError(), statusText);
+  setOtaApplyState(OTA_APPLY_IN_PROGRESS, 0, 0, "Download firmware...");
+  app.ota.applyBytesTotal = contentLength > 0 ? (uint32_t)contentLength : 0;
   pumpOtaUi();
+
+  mbedtls_sha256_context sha;
+  mbedtls_sha256_init(&sha);
+  mbedtls_sha256_starts(&sha, 0);
+
+  static uint8_t buf[1024];
+  int totalWritten = 0;
+  unsigned long lastPumpMs = millis();
+  unsigned long lastDataMs = millis();
+  bool streamError = false;
+
+  while (http.connected() && (contentLength < 0 || totalWritten < contentLength)) {
+    size_t available = stream->available();
+    if (available == 0) {
+      if (millis() - lastDataMs > 15000UL) {
+        streamError = true;
+        break;
+      }
+      delay(1);
+      continue;
+    }
+    lastDataMs = millis();
+
+    size_t toRead = available < sizeof(buf) ? available : sizeof(buf);
+    size_t bytesRead = stream->readBytes(buf, toRead);
+    if (bytesRead == 0) {
+      streamError = true;
+      break;
+    }
+
+    mbedtls_sha256_update(&sha, buf, bytesRead);
+    if (Update.write(buf, bytesRead) != bytesRead) {
+      streamError = true;
+      break;
+    }
+
+    totalWritten += (int)bytesRead;
+    app.ota.applyBytesCurrent = (uint32_t)totalWritten;
+
+    if (millis() - lastPumpMs > 200UL) {
+      int percent = contentLength > 0 ? (totalWritten * 100) / contentLength : -1;
+      char statusText[96];
+      if (contentLength > 0) {
+        snprintf(statusText, sizeof(statusText),
+          "Download firmware... %d%% (%lu/%lu KB)",
+          percent,
+          (unsigned long)(totalWritten / 1024),
+          (unsigned long)(contentLength / 1024));
+      } else {
+        snprintf(statusText, sizeof(statusText),
+          "Download firmware... %lu KB",
+          (unsigned long)(totalWritten / 1024));
+      }
+      setOtaApplyState(OTA_APPLY_IN_PROGRESS, percent, 0, statusText);
+      pumpOtaUi();
+      lastPumpMs = millis();
+    }
+  }
+
+  http.end();
+
+  uint8_t computedHash[32];
+  mbedtls_sha256_finish(&sha, computedHash);
+  mbedtls_sha256_free(&sha);
+
+  if (streamError || (contentLength > 0 && totalWritten != contentLength)) {
+    Update.abort();
+    setOtaApplyState(OTA_APPLY_FAILED, -1, 0, "Download interrotto o incompleto.");
+    pumpOtaUi();
+    return;
+  }
+
+  if (app.ota.remoteSha256[0] != '\0' && strlen(app.ota.remoteSha256) == 64) {
+    bool hashOk = true;
+    for (int i = 0; i < 32 && hashOk; i++) {
+      char hex[3] = { app.ota.remoteSha256[i * 2], app.ota.remoteSha256[i * 2 + 1], '\0' };
+      if ((uint8_t)strtol(hex, nullptr, 16) != computedHash[i]) {
+        hashOk = false;
+      }
+    }
+    if (!hashOk) {
+      Update.abort();
+      setOtaApplyState(OTA_APPLY_FAILED, -1, -1, "Checksum SHA256 non valido. Update annullato.");
+      pumpOtaUi();
+      return;
+    }
+    DEBUG_NETWORK_PRINT("[OTA] SHA256 verificato.");
+  } else {
+    DEBUG_NETWORK_PRINT("[OTA] SHA256 assente nel manifest, skip verifica.");
+  }
+
+  if (!Update.end(true)) {
+    char statusText[64];
+    snprintf(statusText, sizeof(statusText), "Errore finalizzazione flash (%d).", (int)Update.getError());
+    setOtaApplyState(OTA_APPLY_FAILED, -1, (int)Update.getError(), statusText);
+    pumpOtaUi();
+    return;
+  }
+
+  setOtaApplyState(OTA_APPLY_SUCCESS, 100, 0, "Update installato. Riavvio...");
+  app.ota.applyBytesCurrent = app.ota.applyBytesTotal;
+  pumpOtaUi();
+  delay(500);
+  ESP.restart();
 }
