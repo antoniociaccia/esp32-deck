@@ -8,13 +8,15 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <ctime>
 
 using uint8_t = std::uint8_t;
 using uint16_t = std::uint16_t;
 using uint32_t = std::uint32_t;
 
+extern unsigned long mockMillis;
 inline unsigned long millis() {
-  return 0;
+  return mockMillis;
 }
 
 inline bool isDigit(char c) {
@@ -48,6 +50,13 @@ public:
   String() = default;
   String(const char *s) : value_(s == nullptr ? "" : s) {}
   String(const std::string &s) : value_(s) {}
+  String(int val) : value_(std::to_string(val)) {}
+  String(uint32_t val) : value_(std::to_string(val)) {}
+  String(double val, int decimalPlaces = 2) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.*f", decimalPlaces, val);
+    value_ = buf;
+  }
 
   int length() const { return static_cast<int>(value_.size()); }
   void reserve(std::size_t size) { value_.reserve(size); }
@@ -128,6 +137,11 @@ public:
     return *this;
   }
 
+  String &operator+=(const String &rhs) {
+    value_ += rhs.value_;
+    return *this;
+  }
+
 private:
   std::string value_;
 };
@@ -136,5 +150,15 @@ struct SerialStub {
   void printf(const char * /*fmt*/, ...) {}
 };
 extern SerialStub Serial;
+
+extern bool mockGetLocalTimeResult;
+extern struct tm mockTimeinfoValue;
+
+inline bool getLocalTime(struct tm *info, uint32_t /*ms*/ = 5000) {
+  if (info) *info = mockTimeinfoValue;
+  return mockGetLocalTimeResult;
+}
+
+inline void configTzTime(const char* /*tz*/, const char* /*server1*/, const char* /*server2*/) {}
 
 #endif
