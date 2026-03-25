@@ -170,7 +170,7 @@ void startOtaFirmwareUpdate() {
   WiFiClientSecure client;
   client.setInsecure();
 
-  HTTPUpdate updater(NETWORK_HTTP_TIMEOUT_MS);
+  HTTPUpdate updater(NETWORK_OTA_DOWNLOAD_TIMEOUT_MS);
   updater.rebootOnUpdate(false);
   updater.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
@@ -234,6 +234,7 @@ void startOtaFirmwareUpdate() {
   }
 
   if (result == HTTP_UPDATE_NO_UPDATES) {
+    DEBUG_NETWORK_PRINT("[OTA] HTTPUpdate: NO_UPDATES — version match o x-MD5 mismatch");
     app.ota.eligibility = OTA_ELIGIBILITY_UP_TO_DATE;
     setOtaApplyState(OTA_APPLY_IDLE, -1, 0, "");
     markUiDirty(UI_DIRTY_HEADER);
