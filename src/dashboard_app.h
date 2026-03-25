@@ -78,6 +78,7 @@ struct UiRefs {
   lv_obj_t *moduleBadgeLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleValueLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *moduleMetaLabels[UI_MODULE_COUNT] = {nullptr};
+  lv_obj_t *btLabel = nullptr;
   lv_obj_t *otaPopupOverlay = nullptr;
   lv_obj_t *otaPopupBodyLabel = nullptr;
   lv_obj_t *otaPopupProgressBar = nullptr;
@@ -152,11 +153,20 @@ struct SettingsState {
   bool tapWakeEnabled = true;
   uint8_t inactivityTimeoutMinutes = 5;
   bool wifiEnabled = true;
+  bool bluetoothEnabled = false;
   bool weatherEnabled = true;
   bool newsEnabled = true;
   uint8_t brightnessLevel = 100;
   // 0=solo display off, 1=display+Wi-Fi off, 2=deep sleep (futuro)
   uint8_t powerMode = 1;
+};
+
+struct EnergyState {
+  bool displayOn = true;
+  bool displayOffByInactivity = false;
+  bool wifiDisabledByPolicy = false;
+  bool manualWakeActive = false;
+  unsigned long lastActivityMs = 0;
 };
 
 struct AppState {
@@ -166,6 +176,7 @@ struct AppState {
   NewsState news;
   OtaState ota;
   SettingsState settings;
+  EnergyState energy;
   int currentModuleIndex = 0;
   unsigned long lastSafeHeartbeatMs = 0;
   std::atomic<uint32_t> uiDirtyMask{UI_DIRTY_ALL};

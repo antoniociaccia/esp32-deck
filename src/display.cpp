@@ -144,6 +144,12 @@ void Display::routine(void) {
   lv_task_handler();
 }
 
+void Display::setBacklight(bool on) {
+#ifdef TFT_BL
+  digitalWrite(TFT_BL, on ? TFT_BACKLIGHT_ON : !TFT_BACKLIGHT_ON);
+#endif
+}
+
 bool Display::isTouched() const {
   return touchPressed;
 }

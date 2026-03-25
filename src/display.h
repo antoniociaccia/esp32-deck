@@ -22,6 +22,7 @@ class Display {
 public:
   void init();
   void routine();
+  void setBacklight(bool on);
   bool isTouched() const;
   int touchX() const;
   int touchY() const;

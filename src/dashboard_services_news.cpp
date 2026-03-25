@@ -55,6 +55,9 @@ static bool handleNewsTestMode() {
 }
 
 void updateNewsFeed() {
+  if (!app.settings.newsEnabled) {
+    return;
+  }
   unsigned long refreshInterval = app.news.valid ? TIMING_NEWS_REFRESH_MS : TIMING_NEWS_RETRY_MS;
   if (!intervalElapsed(app.news.lastFetchMs, refreshInterval)) {
     return;

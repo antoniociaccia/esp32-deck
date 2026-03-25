@@ -72,6 +72,9 @@ static bool handleWeatherTestMode() {
 }
 
 void updateWeatherUi() {
+  if (!app.settings.weatherEnabled) {
+    return;
+  }
   unsigned long refreshInterval = app.weather.valid ? TIMING_WEATHER_REFRESH_MS : TIMING_WEATHER_RETRY_MS;
   if (!intervalElapsed(app.weather.lastUpdateMs, refreshInterval)) {
     return;

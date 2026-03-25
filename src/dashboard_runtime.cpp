@@ -3,6 +3,9 @@
 #include "dashboard_support.h"
 #include "dashboard_battery.h"
 #include "dashboard_services.h"
+#include "dashboard_settings.h"
+#include "dashboard_energy.h"
+#include "esp_bt.h"
 #include "dashboard_ui.h"
 #include "config_debug.h"
 #include "config_timing.h"
@@ -43,6 +46,11 @@ void initializeDashboard(Display &screen) {
   DEBUG_BOOT_PRINT("[boot] display init ok");
   DEBUG_BOOT_PRINTF("[boot] Free Heap: %u, Min Free: %u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap());
 
+  loadSettings();
+  if (!app.settings.bluetoothEnabled) {
+    btStop();
+  }
+  app.energy.lastActivityMs = millis();
   app.currentModuleIndex = UI_DEFAULT_MODULE_INDEX;
   strlcpy(app.clock.labelText, "sync orario...", sizeof(app.clock.labelText));
   strlcpy(app.weather.labelText, "meteo n/d", sizeof(app.weather.labelText));
@@ -85,8 +93,18 @@ void runSafeModeLoop() {
 
 static unsigned long lastHeapLogMs = 0;
 
+static bool sLastTouchState = false;
+
 void runDashboardLoop(Display &screen) {
   screen.routine();
+
+  bool touching = screen.isTouched();
+  if (touching && !sLastTouchState) {
+    notifyUserActivity();
+  }
+  sLastTouchState = touching;
+
+  applyEnergyPolicy(screen);
   updateUiDirtyStateFromConnectivity();
   maintainTimeSync();
   updateClockUi();

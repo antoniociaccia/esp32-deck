@@ -43,7 +43,9 @@ static void ensureWifiConnection() {
   if (WiFi.status() == WL_CONNECTED || strlen(WIFI_SSID) == 0) {
     return;
   }
-
+  if (!app.settings.wifiEnabled || app.energy.wifiDisabledByPolicy) {
+    return;
+  }
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }

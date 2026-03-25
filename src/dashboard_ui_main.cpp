@@ -539,6 +539,10 @@ static void updateNewsModuleCard() {
   setServiceBadgeFromState(4, app.news.state);
 }
 
+static void cardFadeAnimCb(void *obj, int32_t v) {
+  lv_obj_set_style_opa(static_cast<lv_obj_t *>(obj), (lv_opa_t)v, 0);
+}
+
 static void tileviewEventCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) {
     return;
@@ -549,6 +553,16 @@ static void tileviewEventCb(lv_event_t *e) {
     if (ui.moduleTiles[i] == activeTile) {
       app.currentModuleIndex = i;
       markUiDirty(UI_DIRTY_MAIN_TILE_STATE);
+
+      lv_obj_set_style_opa(activeTile, LV_OPA_TRANSP, 0);
+      lv_anim_t a;
+      lv_anim_init(&a);
+      lv_anim_set_var(&a, activeTile);
+      lv_anim_set_exec_cb(&a, cardFadeAnimCb);
+      lv_anim_set_values(&a, LV_OPA_TRANSP, LV_OPA_COVER);
+      lv_anim_set_time(&a, 180);
+      lv_anim_start(&a);
+
       refreshDashboardUi();
       break;
     }

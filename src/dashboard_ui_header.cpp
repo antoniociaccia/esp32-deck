@@ -189,6 +189,12 @@ static const char *compactWeatherHeaderText() {
   }
 }
 
+static bool sOtaAnimStarted = false;
+
+static void otaPulseAnimCb(void *obj, int32_t v) {
+  lv_obj_set_style_opa(static_cast<lv_obj_t *>(obj), (lv_opa_t)v, 0);
+}
+
 static void refreshOtaHeaderUi() {
   if (ui.otaButton == nullptr || ui.otaLabel == nullptr) {
     return;
@@ -197,9 +203,29 @@ static void refreshOtaHeaderUi() {
   bool otaVisible = DEBUG_OTA_BUTTON_ALWAYS_VISIBLE
     || (app.ota.state == SERVICE_FETCH_READY && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE)
     || (app.ota.applyState != OTA_APPLY_IDLE);
+  bool updateAvailable = app.ota.state == SERVICE_FETCH_READY
+    && app.ota.eligibility == OTA_ELIGIBILITY_UPDATE_AVAILABLE;
+
   if (otaVisible) {
     lv_obj_clear_flag(ui.otaButton, LV_OBJ_FLAG_HIDDEN);
+    if (updateAvailable && !sOtaAnimStarted) {
+      lv_anim_t a;
+      lv_anim_init(&a);
+      lv_anim_set_var(&a, ui.otaButton);
+      lv_anim_set_exec_cb(&a, otaPulseAnimCb);
+      lv_anim_set_values(&a, LV_OPA_40, LV_OPA_COVER);
+      lv_anim_set_time(&a, 700);
+      lv_anim_set_playback_time(&a, 700);
+      lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+      lv_anim_start(&a);
+      sOtaAnimStarted = true;
+    }
   } else {
+    if (sOtaAnimStarted) {
+      lv_anim_del(ui.otaButton, otaPulseAnimCb);
+      lv_obj_set_style_opa(ui.otaButton, LV_OPA_COVER, 0);
+      sOtaAnimStarted = false;
+    }
     lv_obj_add_flag(ui.otaButton, LV_OBJ_FLAG_HIDDEN);
     destroyOtaPopup();
   }
@@ -339,6 +365,17 @@ static void refreshBatteryHeaderUi() {
   batteryHeaderInitialized = true;
 }
 
+static void refreshBtHeaderUi() {
+  if (ui.btLabel == nullptr) return;
+  if (app.settings.bluetoothEnabled) {
+    lv_obj_set_style_text_color(ui.btLabel, lv_color_hex(UI_COLOR_TEXT_INFO), LV_PART_MAIN);
+    lv_obj_clear_flag(ui.btLabel, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_set_style_text_color(ui.btLabel, lv_color_hex(0x444444), LV_PART_MAIN);
+    lv_obj_add_flag(ui.btLabel, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
 void createDashboardHeader(lv_obj_t *parent) {
   lv_obj_t *header = lv_obj_create(parent);
   lv_obj_set_size(header, UI_HEADER_WIDTH, UI_HEADER_HEIGHT);
@@ -466,6 +503,11 @@ void createDashboardHeader(lv_obj_t *parent) {
   lv_obj_set_width(ui.batteryVoltageLabel, 34);
   lv_obj_set_style_text_align(ui.batteryVoltageLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
 
+  ui.btLabel = lv_label_create(rightWrap);
+  lv_label_set_text(ui.btLabel, LV_SYMBOL_BLUETOOTH);
+  setDashboardLabelFont(ui.btLabel, &lv_font_montserrat_12);
+  lv_obj_set_style_text_color(ui.btLabel, lv_color_hex(0x444444), LV_PART_MAIN);
+
   ui.batteryIconLabel = lv_label_create(rightWrap);
   lv_label_set_text(ui.batteryIconLabel, LV_SYMBOL_BATTERY_3);
   setDashboardLabelFont(ui.batteryIconLabel, &lv_font_montserrat_12);
@@ -487,6 +529,7 @@ void createDashboardHeader(lv_obj_t *parent) {
 
 void refreshDashboardHeaderUi() {
   updateWifiUi();
+  refreshBtHeaderUi();
   refreshOtaHeaderUi();
   refreshClockHeaderUi();
   refreshWeatherHeaderUi();

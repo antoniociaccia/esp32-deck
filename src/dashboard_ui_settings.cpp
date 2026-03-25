@@ -1,22 +1,33 @@
 #include "dashboard_ui_settings.h"
 #include "dashboard_app.h"
+#include "dashboard_settings.h"
+#include "dashboard_energy.h"
 #include "dashboard_support.h"
 #include "dashboard_ui_shared.h"
 #include "config_ui.h"
+#include "version.h"
+#include "esp_bt.h"
+#include <WiFi.h>
 
-static constexpr lv_coord_t SETTINGS_ROW_H = 28;
-static constexpr lv_coord_t SETTINGS_STEP_BTN_W = 24;
-static constexpr lv_coord_t SETTINGS_STEP_BTN_H = 24;
-static constexpr lv_coord_t SETTINGS_STEP_VAL_W = 38;
+static constexpr lv_coord_t SETTINGS_ROW_H = 36;
+static constexpr lv_coord_t SETTINGS_STEP_BTN_W = 30;
+static constexpr lv_coord_t SETTINGS_STEP_BTN_H = 30;
+static constexpr lv_coord_t SETTINGS_STEP_VAL_W = 42;
 
 static lv_obj_t *sEnergySwitch = nullptr;
 static lv_obj_t *sStartTimeLabel = nullptr;
 static lv_obj_t *sEndTimeLabel = nullptr;
 static lv_obj_t *sPowerModeLabel = nullptr;
-static lv_obj_t *sBrightnessSlider = nullptr;
 static lv_obj_t *sTapWakeSwitch = nullptr;
 static lv_obj_t *sTimeoutLabel = nullptr;
 static lv_obj_t *sWifiSwitch = nullptr;
+static lv_obj_t *sBluetoothSwitch = nullptr;
+static lv_obj_t *sWeatherSwitch = nullptr;
+static lv_obj_t *sNewsSwitch = nullptr;
+static lv_obj_t *sSysVersionLabel = nullptr;
+static lv_obj_t *sSysWifiLabel = nullptr;
+static lv_obj_t *sSysNtpLabel = nullptr;
+static lv_obj_t *sSysUptimeLabel = nullptr;
 
 // ---- Text helpers ----
 
@@ -54,9 +65,6 @@ void refreshSettingsModuleTile() {
   if (sPowerModeLabel != nullptr) {
     setDashboardLabelTextIfChanged(sPowerModeLabel, powerModeText(app.settings.powerMode));
   }
-  if (sBrightnessSlider != nullptr) {
-    lv_slider_set_value(sBrightnessSlider, app.settings.brightnessLevel, LV_ANIM_OFF);
-  }
   if (sTapWakeSwitch != nullptr) {
     if (app.settings.tapWakeEnabled) {
       lv_obj_add_state(sTapWakeSwitch, LV_STATE_CHECKED);
@@ -76,6 +84,57 @@ void refreshSettingsModuleTile() {
       lv_obj_clear_state(sWifiSwitch, LV_STATE_CHECKED);
     }
   }
+  if (sBluetoothSwitch != nullptr) {
+    if (app.settings.bluetoothEnabled) {
+      lv_obj_add_state(sBluetoothSwitch, LV_STATE_CHECKED);
+    } else {
+      lv_obj_clear_state(sBluetoothSwitch, LV_STATE_CHECKED);
+    }
+  }
+  if (sWeatherSwitch != nullptr) {
+    if (app.settings.weatherEnabled) {
+      lv_obj_add_state(sWeatherSwitch, LV_STATE_CHECKED);
+    } else {
+      lv_obj_clear_state(sWeatherSwitch, LV_STATE_CHECKED);
+    }
+  }
+  if (sNewsSwitch != nullptr) {
+    if (app.settings.newsEnabled) {
+      lv_obj_add_state(sNewsSwitch, LV_STATE_CHECKED);
+    } else {
+      lv_obj_clear_state(sNewsSwitch, LV_STATE_CHECKED);
+    }
+  }
+  if (sSysVersionLabel != nullptr) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s · %s", FW_VERSION, FW_BOARD_ID);
+    setDashboardLabelTextIfChanged(sSysVersionLabel, buf);
+  }
+  if (sSysWifiLabel != nullptr) {
+    char buf[24];
+    if (WiFi.status() == WL_CONNECTED) {
+      snprintf(buf, sizeof(buf), "ok · %d dBm", WiFi.RSSI());
+    } else {
+      strlcpy(buf, "disconnesso", sizeof(buf));
+    }
+    setDashboardLabelTextIfChanged(sSysWifiLabel, buf);
+  }
+  if (sSysNtpLabel != nullptr) {
+    setDashboardLabelTextIfChanged(sSysNtpLabel,
+      app.clock.synced ? "sincronizzato" : "in attesa");
+  }
+  if (sSysUptimeLabel != nullptr) {
+    char buf[16];
+    unsigned long secs = millis() / 1000;
+    unsigned long h = secs / 3600;
+    unsigned long m = (secs % 3600) / 60;
+    if (h > 0) {
+      snprintf(buf, sizeof(buf), "%luh %02lum", h, m);
+    } else {
+      snprintf(buf, sizeof(buf), "%lum %02lus", m, secs % 60);
+    }
+    setDashboardLabelTextIfChanged(sSysUptimeLabel, buf);
+  }
 }
 
 // ---- Event callbacks ----
@@ -83,17 +142,46 @@ void refreshSettingsModuleTile() {
 static void energySwitchCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
   app.settings.energyScheduleEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  saveSettings();
   refreshSettingsModuleTile();
 }
 
 static void tapWakeSwitchCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
   app.settings.tapWakeEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  saveSettings();
 }
 
 static void wifiSwitchCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
   app.settings.wifiEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  applyWifiUserEnabled(app.settings.wifiEnabled);
+  markUiDirty(UI_DIRTY_HEADER);
+  saveSettings();
+}
+
+static void bluetoothSwitchCb(lv_event_t *e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  app.settings.bluetoothEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  if (app.settings.bluetoothEnabled) {
+    btStart();
+  } else {
+    btStop();
+  }
+  markUiDirty(UI_DIRTY_HEADER);
+  saveSettings();
+}
+
+static void weatherSwitchCb(lv_event_t *e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  app.settings.weatherEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  saveSettings();
+}
+
+static void newsSwitchCb(lv_event_t *e) {
+  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
+  app.settings.newsEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+  saveSettings();
 }
 
 enum SettingsStepAction : uint8_t {
@@ -133,6 +221,7 @@ static void stepCb(lv_event_t *e) {
       }
       break;
   }
+  saveSettings();
   refreshSettingsModuleTile();
 }
 
@@ -140,12 +229,8 @@ static void powerModeCycleCb(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   if (code != LV_EVENT_CLICKED && code != LV_EVENT_SHORT_CLICKED) return;
   app.settings.powerMode = (app.settings.powerMode + 1) % 3;
+  saveSettings();
   refreshSettingsModuleTile();
-}
-
-static void brightnessSliderCb(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
-  app.settings.brightnessLevel = (uint8_t)lv_slider_get_value(lv_event_get_target(e));
 }
 
 // ---- Layout helpers ----
@@ -156,8 +241,8 @@ static lv_obj_t *createRow(lv_obj_t *parent) {
   lv_obj_set_style_min_height(row, SETTINGS_ROW_H, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(row, 0, 0);
-  lv_obj_set_style_pad_hor(row, 4, 0);
-  lv_obj_set_style_pad_ver(row, 0, 0);
+  lv_obj_set_style_pad_hor(row, 8, 0);
+  lv_obj_set_style_pad_ver(row, 4, 0);
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
@@ -183,7 +268,7 @@ static void createSeparator(lv_obj_t *parent) {
 
 static lv_obj_t *createSwitch(lv_obj_t *row) {
   lv_obj_t *sw = lv_switch_create(row);
-  lv_obj_set_size(sw, 40, 20);
+  lv_obj_set_size(sw, 46, 24);
   lv_obj_set_style_bg_color(sw, colorFromHex(0xCBD5E1), 0);
   lv_obj_set_style_bg_color(sw, colorFromHex(UI_COLOR_ACCENT), LV_STATE_CHECKED);
   return sw;
@@ -221,8 +306,8 @@ static lv_obj_t *createStepValueLabel(lv_obj_t *row) {
 // ---- Tile ----
 
 void createSettingsModuleTile(lv_obj_t *tile) {
-  lv_obj_set_style_pad_all(tile, 6, 0);
-  lv_obj_set_style_pad_row(tile, 0, 0);
+  lv_obj_set_style_pad_all(tile, 8, 0);
+  lv_obj_set_style_pad_row(tile, 2, 0);
   lv_obj_add_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scrollbar_mode(tile, LV_SCROLLBAR_MODE_ACTIVE);
 
@@ -261,12 +346,12 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     lv_obj_t *row = createRow(tile);
     createRowLabel(row, "Modalita energia");
     lv_obj_t *modeBtn = lv_btn_create(row);
-    lv_obj_set_size(modeBtn, 110, 22);
+    lv_obj_set_size(modeBtn, 114, 28);
     lv_obj_set_style_bg_color(modeBtn, colorFromHex(UI_COLOR_HEADER_BG), 0);
     lv_obj_set_style_border_width(modeBtn, 0, 0);
     lv_obj_set_style_shadow_width(modeBtn, 0, 0);
     lv_obj_set_style_radius(modeBtn, 6, 0);
-    lv_obj_set_style_pad_all(modeBtn, 2, 0);
+    lv_obj_set_style_pad_all(modeBtn, 4, 0);
     lv_obj_set_ext_click_area(modeBtn, 4);
     lv_obj_add_event_cb(modeBtn, powerModeCycleCb, LV_EVENT_CLICKED, nullptr);
     lv_obj_add_event_cb(modeBtn, powerModeCycleCb, LV_EVENT_SHORT_CLICKED, nullptr);
@@ -275,24 +360,6 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     setDashboardLabelFont(sPowerModeLabel, &lv_font_montserrat_10);
     setDashboardLabelColor(sPowerModeLabel, UI_COLOR_TEXT_INFO);
     lv_obj_center(sPowerModeLabel);
-  }
-
-  createSeparator(tile);
-
-  // Row: Luminosita
-  {
-    lv_obj_t *row = createRow(tile);
-    createRowLabel(row, "Luminosita");
-    sBrightnessSlider = lv_slider_create(row);
-    lv_obj_set_size(sBrightnessSlider, 110, 10);
-    lv_slider_set_range(sBrightnessSlider, 10, 100);
-    lv_obj_set_style_bg_color(sBrightnessSlider, colorFromHex(0xCBD5E1), 0);
-    lv_obj_set_style_bg_color(sBrightnessSlider, colorFromHex(UI_COLOR_ACCENT), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(sBrightnessSlider, colorFromHex(UI_COLOR_TEXT_LIGHT), LV_PART_KNOB);
-    lv_obj_set_style_radius(sBrightnessSlider, 5, 0);
-    lv_obj_set_style_radius(sBrightnessSlider, 5, LV_PART_INDICATOR);
-    lv_obj_set_ext_click_area(sBrightnessSlider, 8);
-    lv_obj_add_event_cb(sBrightnessSlider, brightnessSliderCb, LV_EVENT_VALUE_CHANGED, nullptr);
   }
 
   createSeparator(tile);
@@ -322,6 +389,83 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Wi-Fi");
     sWifiSwitch = createSwitch(row);
     lv_obj_add_event_cb(sWifiSwitch, wifiSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+
+  // Row: Bluetooth
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Bluetooth");
+    sBluetoothSwitch = createSwitch(row);
+    lv_obj_add_event_cb(sBluetoothSwitch, bluetoothSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+
+  createSeparator(tile);
+
+  // Row: Fetch meteo
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Fetch meteo");
+    sWeatherSwitch = createSwitch(row);
+    lv_obj_add_event_cb(sWeatherSwitch, weatherSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+
+  // Row: Fetch news
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Fetch news");
+    sNewsSwitch = createSwitch(row);
+    lv_obj_add_event_cb(sNewsSwitch, newsSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+
+  createSeparator(tile);
+
+  // Section header: Sistema
+  {
+    lv_obj_t *row = createRow(tile);
+    lv_obj_t *label = lv_label_create(row);
+    lv_label_set_text(label, "SISTEMA");
+    setDashboardLabelFont(label, &lv_font_montserrat_10);
+    setDashboardLabelColor(label, UI_COLOR_TEXT_MUTED);
+  }
+
+  // Row: Firmware
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Firmware");
+    sSysVersionLabel = lv_label_create(row);
+    lv_label_set_text(sSysVersionLabel, "--");
+    setDashboardLabelFont(sSysVersionLabel, &lv_font_montserrat_12);
+    setDashboardLabelColor(sSysVersionLabel, UI_COLOR_TEXT_SECONDARY);
+  }
+
+  // Row: Wi-Fi status
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Wi-Fi");
+    sSysWifiLabel = lv_label_create(row);
+    lv_label_set_text(sSysWifiLabel, "--");
+    setDashboardLabelFont(sSysWifiLabel, &lv_font_montserrat_12);
+    setDashboardLabelColor(sSysWifiLabel, UI_COLOR_TEXT_SECONDARY);
+  }
+
+  // Row: NTP
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "NTP");
+    sSysNtpLabel = lv_label_create(row);
+    lv_label_set_text(sSysNtpLabel, "--");
+    setDashboardLabelFont(sSysNtpLabel, &lv_font_montserrat_12);
+    setDashboardLabelColor(sSysNtpLabel, UI_COLOR_TEXT_SECONDARY);
+  }
+
+  // Row: Uptime
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Uptime");
+    sSysUptimeLabel = lv_label_create(row);
+    lv_label_set_text(sSysUptimeLabel, "--");
+    setDashboardLabelFont(sSysUptimeLabel, &lv_font_montserrat_12);
+    setDashboardLabelColor(sSysUptimeLabel, UI_COLOR_TEXT_SECONDARY);
   }
 
   refreshSettingsModuleTile();
