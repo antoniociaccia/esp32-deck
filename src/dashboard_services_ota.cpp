@@ -60,7 +60,7 @@ void updateOtaManifestCheck() {
     app.ota.lastCheckMs = millis();
   }
 
-  ServiceSnapshot<OtaState> snap(app.ota, UI_DIRTY_HEADER);
+  ServiceSnapshot<OtaState> snap(app.ota, UI_DIRTY_HEADER | UI_DIRTY_MAIN_SETTINGS);
 
   if (WiFi.status() != WL_CONNECTED) {
     setOtaCheckFailure(SERVICE_FETCH_OFFLINE);
@@ -139,7 +139,7 @@ void requestOtaManifestRefresh() {
   app.ota.state = SERVICE_FETCH_IDLE;
   app.ota.lastHttpCode = 0;
   app.ota.lastCheckMs = 0;
-  markUiDirty(UI_DIRTY_HEADER);
+  markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_SETTINGS);
 }
 
 void startOtaFirmwareUpdate() {

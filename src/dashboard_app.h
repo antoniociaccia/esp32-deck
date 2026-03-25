@@ -49,7 +49,9 @@ static constexpr uint32_t UI_DIRTY_MAIN_POWER = 1UL << 3;
 static constexpr uint32_t UI_DIRTY_MAIN_WEATHER = 1UL << 4;
 static constexpr uint32_t UI_DIRTY_MAIN_NEWS = 1UL << 5;
 static constexpr uint32_t UI_DIRTY_MAIN_TILE_STATE = 1UL << 6;
+static constexpr uint32_t UI_DIRTY_MAIN_SETTINGS = 1UL << 7;
 static constexpr uint32_t UI_DIRTY_MAIN_ALL =
+  UI_DIRTY_MAIN_SETTINGS |
   UI_DIRTY_MAIN_CLOCK |
   UI_DIRTY_MAIN_POWER |
   UI_DIRTY_MAIN_WEATHER |

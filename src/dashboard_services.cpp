@@ -35,12 +35,12 @@ void updateClockUi() {
   }
 
   if (strcmp(previousClockText, app.clock.labelText) != 0 || previousTimeSynced != app.clock.synced) {
-    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_CLOCK);
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_SETTINGS | UI_DIRTY_MAIN_CLOCK);
   }
 }
 
 static void ensureWifiConnection() {
-  if (WiFi.status() == WL_CONNECTED || strlen(WIFI_SSID) == 0) {
+  if (strlen(WIFI_SSID) == 0) {
     return;
   }
   if (!app.settings.wifiEnabled || app.energy.wifiDisabledByPolicy) {
@@ -85,7 +85,6 @@ void maintainTimeSync() {
 
   if (millis() - app.clock.lastSyncAttemptMs > TIMING_NTP_RETRY_MS) {
     DEBUG_NETWORK_PRINT("Ritento sync NTP");
-    configTzTime(TZ_INFO, NTP_SERVER_1, NTP_SERVER_2);
-    app.clock.lastSyncAttemptMs = millis();
+    beginTimeSync();
   }
 }

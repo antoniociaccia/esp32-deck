@@ -2,6 +2,7 @@
 #include "dashboard_app.h"
 #include "dashboard_settings.h"
 #include "dashboard_energy.h"
+#include "dashboard_services.h"
 #include "dashboard_support.h"
 #include "dashboard_ui_shared.h"
 #include "config_ui.h"
@@ -27,6 +28,7 @@ static lv_obj_t *sNewsSwitch = nullptr;
 static lv_obj_t *sSysVersionLabel = nullptr;
 static lv_obj_t *sSysWifiLabel = nullptr;
 static lv_obj_t *sSysNtpLabel = nullptr;
+static lv_obj_t *sSysOtaLabel = nullptr;
 static lv_obj_t *sSysUptimeLabel = nullptr;
 
 // ---- Text helpers ----
@@ -37,6 +39,57 @@ static const char *powerModeText(uint8_t mode) {
     case 1: return "display+Wi-Fi";
     case 2: return "deep sleep";
     default: return "--";
+  }
+}
+
+static const char *otaStatusText() {
+  if (app.ota.applyState == OTA_APPLY_IN_PROGRESS) {
+    return "installazione";
+  }
+  if (app.ota.applyState == OTA_APPLY_FAILED) {
+    return "errore update";
+  }
+  if (app.ota.applyState == OTA_APPLY_SUCCESS) {
+    return "riavvio";
+  }
+
+  switch (app.ota.state) {
+    case SERVICE_FETCH_IDLE:
+      return "in attesa";
+    case SERVICE_FETCH_FETCHING:
+      return "controllo...";
+    case SERVICE_FETCH_OFFLINE:
+      return "offline";
+    case SERVICE_FETCH_CONFIG_MISSING:
+      return "non configurato";
+    case SERVICE_FETCH_TRANSPORT_ERROR:
+      return "errore rete";
+    case SERVICE_FETCH_HTTP_ERROR:
+      return "errore http";
+    case SERVICE_FETCH_INVALID_PAYLOAD:
+      return "manifest errato";
+    case SERVICE_FETCH_READY:
+      break;
+  }
+
+  switch (app.ota.eligibility) {
+    case OTA_ELIGIBILITY_UPDATE_AVAILABLE:
+      return "update disponibile";
+    case OTA_ELIGIBILITY_UP_TO_DATE:
+      return "aggiornato";
+    case OTA_ELIGIBILITY_BATTERY_TOO_LOW:
+      return "batteria bassa";
+    case OTA_ELIGIBILITY_BATTERY_UNKNOWN:
+      return "batteria ignota";
+    case OTA_ELIGIBILITY_SLOT_TOO_SMALL:
+      return "slot insufficiente";
+    case OTA_ELIGIBILITY_INCOMPATIBLE_BOARD:
+      return "board errata";
+    case OTA_ELIGIBILITY_INCOMPATIBLE_CHANNEL:
+      return "canale errato";
+    case OTA_ELIGIBILITY_INVALID:
+    default:
+      return "stato non valido";
   }
 }
 
@@ -123,6 +176,9 @@ void refreshSettingsModuleTile() {
     setDashboardLabelTextIfChanged(sSysNtpLabel,
       app.clock.synced ? "sincronizzato" : "in attesa");
   }
+  if (sSysOtaLabel != nullptr) {
+    setDashboardLabelTextIfChanged(sSysOtaLabel, otaStatusText());
+  }
   if (sSysUptimeLabel != nullptr) {
     char buf[16];
     unsigned long secs = millis() / 1000;
@@ -138,6 +194,24 @@ void refreshSettingsModuleTile() {
 }
 
 // ---- Event callbacks ----
+
+static void commitSwitchState(lv_obj_t *sw, bool enabled) {
+  if (enabled) {
+    lv_obj_add_state(sw, LV_STATE_CHECKED);
+  } else {
+    lv_obj_clear_state(sw, LV_STATE_CHECKED);
+  }
+  lv_event_send(sw, LV_EVENT_VALUE_CHANGED, nullptr);
+}
+
+static void toggleSwitchFromRowCb(lv_event_t *e) {
+  lv_event_code_t code = lv_event_get_code(e);
+  if (code != LV_EVENT_CLICKED && code != LV_EVENT_SHORT_CLICKED) return;
+
+  lv_obj_t *sw = static_cast<lv_obj_t *>(lv_event_get_user_data(e));
+  if (sw == nullptr) return;
+  commitSwitchState(sw, !lv_obj_has_state(sw, LV_STATE_CHECKED));
+}
 
 static void energySwitchCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
@@ -182,6 +256,13 @@ static void newsSwitchCb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) return;
   app.settings.newsEnabled = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
   saveSettings();
+}
+
+static void otaCheckCb(lv_event_t *e) {
+  lv_event_code_t code = lv_event_get_code(e);
+  if (code != LV_EVENT_CLICKED && code != LV_EVENT_SHORT_CLICKED) return;
+  requestOtaManifestRefresh();
+  refreshSettingsModuleTile();
 }
 
 enum SettingsStepAction : uint8_t {
@@ -271,7 +352,28 @@ static lv_obj_t *createSwitch(lv_obj_t *row) {
   lv_obj_set_size(sw, 46, 24);
   lv_obj_set_style_bg_color(sw, colorFromHex(0xCBD5E1), 0);
   lv_obj_set_style_bg_color(sw, colorFromHex(UI_COLOR_ACCENT), LV_STATE_CHECKED);
+  lv_obj_set_ext_click_area(sw, 8);
   return sw;
+}
+
+static lv_obj_t *createActionButton(lv_obj_t *row, const char *text, lv_event_cb_t cb) {
+  lv_obj_t *btn = lv_btn_create(row);
+  lv_obj_set_size(btn, 84, 28);
+  lv_obj_set_style_bg_color(btn, colorFromHex(UI_COLOR_HEADER_BG), 0);
+  lv_obj_set_style_border_width(btn, 0, 0);
+  lv_obj_set_style_shadow_width(btn, 0, 0);
+  lv_obj_set_style_radius(btn, 6, 0);
+  lv_obj_set_style_pad_all(btn, 4, 0);
+  lv_obj_set_ext_click_area(btn, 6);
+  lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, nullptr);
+  lv_obj_add_event_cb(btn, cb, LV_EVENT_SHORT_CLICKED, nullptr);
+
+  lv_obj_t *lbl = lv_label_create(btn);
+  lv_label_set_text(lbl, text);
+  setDashboardLabelFont(lbl, &lv_font_montserrat_10);
+  setDashboardLabelColor(lbl, UI_COLOR_TEXT_INFO);
+  lv_obj_center(lbl);
+  return btn;
 }
 
 static lv_obj_t *createStepBtn(lv_obj_t *row, const char *sym, SettingsStepAction action) {
@@ -317,6 +419,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Pianificazione energetica");
     sEnergySwitch = createSwitch(row);
     lv_obj_add_event_cb(sEnergySwitch, energySwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sEnergySwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sEnergySwitch);
   }
 
   createSeparator(tile);
@@ -370,6 +474,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Wake con tap");
     sTapWakeSwitch = createSwitch(row);
     lv_obj_add_event_cb(sTapWakeSwitch, tapWakeSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sTapWakeSwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sTapWakeSwitch);
   }
 
   // Row: Timeout inattivita
@@ -389,6 +495,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Wi-Fi");
     sWifiSwitch = createSwitch(row);
     lv_obj_add_event_cb(sWifiSwitch, wifiSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sWifiSwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sWifiSwitch);
   }
 
   // Row: Bluetooth
@@ -397,6 +505,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Bluetooth");
     sBluetoothSwitch = createSwitch(row);
     lv_obj_add_event_cb(sBluetoothSwitch, bluetoothSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sBluetoothSwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sBluetoothSwitch);
   }
 
   createSeparator(tile);
@@ -407,6 +517,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Fetch meteo");
     sWeatherSwitch = createSwitch(row);
     lv_obj_add_event_cb(sWeatherSwitch, weatherSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sWeatherSwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sWeatherSwitch);
   }
 
   // Row: Fetch news
@@ -415,6 +527,8 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     createRowLabel(row, "Fetch news");
     sNewsSwitch = createSwitch(row);
     lv_obj_add_event_cb(sNewsSwitch, newsSwitchCb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_CLICKED, sNewsSwitch);
+    lv_obj_add_event_cb(row, toggleSwitchFromRowCb, LV_EVENT_SHORT_CLICKED, sNewsSwitch);
   }
 
   createSeparator(tile);
@@ -438,6 +552,13 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     setDashboardLabelColor(sSysVersionLabel, UI_COLOR_TEXT_SECONDARY);
   }
 
+  // Row: Controllo OTA
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Controllo OTA");
+    createActionButton(row, "Verifica", otaCheckCb);
+  }
+
   // Row: Wi-Fi status
   {
     lv_obj_t *row = createRow(tile);
@@ -456,6 +577,16 @@ void createSettingsModuleTile(lv_obj_t *tile) {
     lv_label_set_text(sSysNtpLabel, "--");
     setDashboardLabelFont(sSysNtpLabel, &lv_font_montserrat_12);
     setDashboardLabelColor(sSysNtpLabel, UI_COLOR_TEXT_SECONDARY);
+  }
+
+  // Row: Stato OTA
+  {
+    lv_obj_t *row = createRow(tile);
+    createRowLabel(row, "Stato OTA");
+    sSysOtaLabel = lv_label_create(row);
+    lv_label_set_text(sSysOtaLabel, "--");
+    setDashboardLabelFont(sSysOtaLabel, &lv_font_montserrat_12);
+    setDashboardLabelColor(sSysOtaLabel, UI_COLOR_TEXT_SECONDARY);
   }
 
   // Row: Uptime

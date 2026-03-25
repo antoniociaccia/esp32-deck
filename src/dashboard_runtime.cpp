@@ -20,7 +20,7 @@ static void updateUiDirtyStateFromConnectivity() {
     return;
   }
 
-  markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_CLOCK | UI_DIRTY_MAIN_WEATHER | UI_DIRTY_MAIN_NEWS);
+  markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_SETTINGS | UI_DIRTY_MAIN_CLOCK | UI_DIRTY_MAIN_WEATHER | UI_DIRTY_MAIN_NEWS);
   lastWifiConnected = wifiConnected;
   wifiStateInitialized = true;
 }
