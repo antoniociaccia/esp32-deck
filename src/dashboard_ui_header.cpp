@@ -300,9 +300,9 @@ static void refreshBatteryHeaderUi() {
   uint32_t textColor = UI_COLOR_TEXT_MUTED;
 
   if (app.battery.usbPowered) {
-    iconText = LV_SYMBOL_USB;
+    iconText = app.battery.present ? LV_SYMBOL_USB " " LV_SYMBOL_CHARGE : LV_SYMBOL_USB;
     textColor = UI_COLOR_TEXT_INFO;
-    strlcpy(percentBuffer, app.battery.present ? LV_SYMBOL_CHARGE : "", sizeof(percentBuffer));
+    strlcpy(percentBuffer, "", sizeof(percentBuffer));
     strlcpy(voltageBuffer, "", sizeof(voltageBuffer));
   } else if (!app.battery.present || app.battery.percent < 0) {
     strlcpy(percentBuffer, "--", sizeof(percentBuffer));
