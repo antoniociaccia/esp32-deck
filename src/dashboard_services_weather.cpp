@@ -116,7 +116,12 @@ void updateWeatherUi() {
     return;
   }
 
-  String payload = http.getString();
+  String payload;
+  int len = http.getSize();
+  if (len > 0) {
+    payload.reserve(len);
+  }
+  payload = http.getString();
   http.end();
 
   int temperature = 0;

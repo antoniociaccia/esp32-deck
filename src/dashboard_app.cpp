@@ -245,12 +245,23 @@ String decodeJsonString(const String &value) {
 }
 
 void normalizeNewsText(String &text) {
-  text.replace("\n", " ");
-  text.replace("\r", " ");
-  while (text.indexOf("  ") >= 0) {
-    text.replace("  ", " ");
+  String normalized;
+  normalized.reserve(text.length());
+  bool lastWasSpace = false;
+  for (int i = 0; i < text.length(); ++i) {
+    char c = text[i];
+    if (c == '\n' || c == '\r' || c == ' ') {
+      if (!lastWasSpace) {
+        normalized += ' ';
+        lastWasSpace = true;
+      }
+    } else {
+      normalized += c;
+      lastWasSpace = false;
+    }
   }
-  text.trim();
+  normalized.trim();
+  text = normalized;
 }
 
 void rebuildNewsTicker() {

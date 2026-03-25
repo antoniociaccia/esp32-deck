@@ -41,6 +41,7 @@ void enterSafeBootRecovery(Display &screen) {
 void initializeDashboard(Display &screen) {
   screen.init();
   DEBUG_BOOT_PRINT("[boot] display init ok");
+  DEBUG_BOOT_PRINTF("[boot] Free Heap: %u, Min Free: %u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap());
 
   app.currentModuleIndex = UI_DEFAULT_MODULE_INDEX;
   strlcpy(app.clock.labelText, "sync orario...", sizeof(app.clock.labelText));
@@ -82,6 +83,8 @@ void runSafeModeLoop() {
   delay(5);
 }
 
+static unsigned long lastHeapLogMs = 0;
+
 void runDashboardLoop(Display &screen) {
   screen.routine();
   updateUiDirtyStateFromConnectivity();
@@ -95,5 +98,10 @@ void runDashboardLoop(Display &screen) {
   }
   updateOtaManifestCheck();
   refreshDashboardUi();
+  
+  if (intervalElapsed(lastHeapLogMs, TIMING_HEAP_LOG_MS)) {
+    DEBUG_NETWORK_PRINTF("[memory] Free Heap: %u bytes, Min Free: %u bytes\n", ESP.getFreeHeap(), ESP.getMinFreeHeap());
+  }
+
   delay(5);
 }
