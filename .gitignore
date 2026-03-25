@@ -17,6 +17,7 @@ build/
 sketch.yaml
 secrets.h
 AGENTS.md
+CLAUDE.md
 n8n-news-workflow.json
 
 # Local private docs
