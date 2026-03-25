@@ -390,7 +390,18 @@ static void updatePowerModuleCard() {
   char valueBuffer[24];
   char metaBuffer[48];
 
-    if (!app.battery.present || app.battery.percent < 0) {
+  if (app.battery.usbPowered) {
+    setModuleIconLabel(2, LV_SYMBOL_USB, UI_COLOR_TEXT_INFO);
+    if (app.battery.present) {
+      strlcpy(valueBuffer, LV_SYMBOL_CHARGE, sizeof(valueBuffer));
+      strlcpy(metaBuffer, "USB · batteria in ricarica", sizeof(metaBuffer));
+      setModuleBadge(2, "carica", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
+    } else {
+      strlcpy(valueBuffer, LV_SYMBOL_USB, sizeof(valueBuffer));
+      strlcpy(metaBuffer, "alimentazione USB", sizeof(metaBuffer));
+      setModuleBadge(2, "usb", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
+    }
+  } else if (!app.battery.present || app.battery.percent < 0) {
     strlcpy(valueBuffer, "--", sizeof(valueBuffer));
     strlcpy(metaBuffer, "batteria assente o instabile", sizeof(metaBuffer));
     setModuleIconLabel(2, LV_SYMBOL_BATTERY_EMPTY, UI_COLOR_TEXT_MUTED);
@@ -399,7 +410,7 @@ static void updatePowerModuleCard() {
     snprintf(valueBuffer, sizeof(valueBuffer), "%d%%", app.battery.percent);
     snprintf(metaBuffer, sizeof(metaBuffer), "%.2fV filtrata", app.battery.voltage);
 
-      if (app.battery.percent >= 85) {
+    if (app.battery.percent >= 85) {
       setModuleIconLabel(2, LV_SYMBOL_BATTERY_FULL, UI_COLOR_ACCENT);
       setModuleBadge(2, "ok", UI_COLOR_BADGE_OK_BG, UI_COLOR_ACCENT);
     } else if (app.battery.percent >= 25) {

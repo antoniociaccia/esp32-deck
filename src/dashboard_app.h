@@ -97,6 +97,7 @@ struct BatteryState {
   float filteredVoltage = 0.0f;
   bool initialized = false;
   bool present = false;
+  bool usbPowered = false;
   int percent = -1;
   float voltage = 0.0f;
 };

@@ -63,6 +63,7 @@ static char lastWeatherHeaderText[32] = {};
 static char lastWeatherHeaderIconCode[8] = {};
 static bool batteryHeaderInitialized = false;
 static bool lastBatteryPresent = false;
+static bool lastUsbPowered = false;
 static int lastBatteryPercent = -999;
 static char lastBatteryVoltageText[12] = {};
 static char lastWeatherHeaderCompactText[20] = {};
@@ -298,7 +299,12 @@ static void refreshBatteryHeaderUi() {
   const char *iconText = LV_SYMBOL_BATTERY_EMPTY;
   uint32_t textColor = UI_COLOR_TEXT_MUTED;
 
-  if (!app.battery.present || app.battery.percent < 0) {
+  if (app.battery.usbPowered) {
+    iconText = LV_SYMBOL_USB;
+    textColor = UI_COLOR_TEXT_INFO;
+    strlcpy(percentBuffer, app.battery.present ? LV_SYMBOL_CHARGE : "", sizeof(percentBuffer));
+    strlcpy(voltageBuffer, "", sizeof(voltageBuffer));
+  } else if (!app.battery.present || app.battery.percent < 0) {
     strlcpy(percentBuffer, "--", sizeof(percentBuffer));
     strlcpy(voltageBuffer, "--.--V", sizeof(voltageBuffer));
   } else {
@@ -319,6 +325,7 @@ static void refreshBatteryHeaderUi() {
   }
 
   if (batteryHeaderInitialized
+    && lastUsbPowered == app.battery.usbPowered
     && lastBatteryPresent == app.battery.present
     && lastBatteryPercent == app.battery.percent
     && strcmp(lastBatteryVoltageText, voltageBuffer) == 0) {
@@ -332,6 +339,7 @@ static void refreshBatteryHeaderUi() {
   setDashboardLabelColor(ui.batteryVoltageLabel, textColor);
   setDashboardLabelColor(ui.batteryIconLabel, textColor);
 
+  lastUsbPowered = app.battery.usbPowered;
   lastBatteryPresent = app.battery.present;
   lastBatteryPercent = app.battery.percent;
   strlcpy(lastBatteryVoltageText, voltageBuffer, sizeof(lastBatteryVoltageText));

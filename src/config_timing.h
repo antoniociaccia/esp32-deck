@@ -12,6 +12,7 @@ static constexpr unsigned long TIMING_OTA_RETRY_MS = 300000;
 static constexpr unsigned long TIMING_WIFI_RECONNECT_MS = 10000;
 static constexpr unsigned long TIMING_NTP_RETRY_MS = 15000;
 static constexpr unsigned long TIMING_SAFE_HEARTBEAT_MS = 2000;
+static constexpr unsigned long TIMING_HEAP_LOG_MS = 30000;
 
 static constexpr bool DASHBOARD_SAFE_BOOT_RECOVERY = false;
 

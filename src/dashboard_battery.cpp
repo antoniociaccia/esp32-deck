@@ -5,6 +5,9 @@
 #include "config_power.h"
 #include "config_timing.h"
 #include <math.h>
+#ifdef ESP32
+#include "soc/usb_serial_jtag_struct.h"
+#endif
 
 static float clampBatteryVoltage(float value) {
   if (value < POWER_BATTERY_EMPTY_VOLTS) {
@@ -94,6 +97,22 @@ void initBatteryMonitoring() {
 void updateBatteryUi() {
   if (!intervalElapsed(app.battery.lastUpdateMs, TIMING_BATTERY_REFRESH_MS)) {
     return;
+  }
+
+  bool previousUsbPowered = app.battery.usbPowered;
+#ifdef ESP32
+  // L'host USB invia pacchetti SOF ogni 1ms. Se il contatore cambia
+  // rispetto alla lettura precedente (2s fa), USB è connesso.
+  {
+    static uint16_t prevSof = 0xFFFF;
+    uint16_t currentSof = static_cast<uint16_t>(
+      USB_SERIAL_JTAG.fram_num.sof_frame_index);
+    app.battery.usbPowered = (currentSof != prevSof);
+    prevSof = currentSof;
+  }
+#endif
+  if (previousUsbPowered != app.battery.usbPowered) {
+    markUiDirty(UI_DIRTY_HEADER | UI_DIRTY_MAIN_POWER);
   }
 
   bool previousBatteryPresent = app.battery.present;
