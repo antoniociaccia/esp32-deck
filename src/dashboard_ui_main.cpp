@@ -3,6 +3,7 @@
 #include "dashboard_ui.h"
 #include "dashboard_support.h"
 #include "dashboard_ui_shared.h"
+#include "dashboard_ui_settings.h"
 #include <WiFi.h>
 #include "secrets.h"
 #include "weather_icons.h"
@@ -327,7 +328,8 @@ static void createNewsModuleCard(lv_obj_t *tile, int moduleIndex) {
 }
 
 static void createSettingsModuleCard(lv_obj_t *tile, int moduleIndex) {
-  createStandardModuleCard(tile, moduleIndex, LV_SYMBOL_SETTINGS, &lv_font_montserrat_20, &lv_font_montserrat_16, &lv_font_montserrat_12, UI_COLOR_TEXT_PRIMARY, UI_COLOR_TEXT_SECONDARY, 52);
+  (void)moduleIndex;
+  createSettingsModuleTile(tile);
 }
 
 static void createModuleTileContent(lv_obj_t *tile, int moduleIndex) {
@@ -345,14 +347,7 @@ static void createModuleTileContent(lv_obj_t *tile, int moduleIndex) {
 }
 
 static void updateSettingsModuleCard() {
-  if (ui.moduleValueLabels[0] == nullptr || ui.moduleMetaLabels[0] == nullptr) {
-    return;
-  }
-
-  setDashboardLabelTextIfChanged(ui.moduleValueLabels[0], "Apri");
-  setDashboardLabelTextIfChanged(ui.moduleMetaLabels[0], "Pianificazione energetica, luminosita, rete e hardware.");
-  setModuleIconLabel(0, LV_SYMBOL_SETTINGS, UI_COLOR_CARD_ICON_SOFT);
-  setModuleBadge(0, "soon", UI_COLOR_BADGE_OFFLINE_BG, UI_COLOR_TEXT_SECONDARY);
+  refreshSettingsModuleTile();
 }
 
 static void updateClockModuleCard() {

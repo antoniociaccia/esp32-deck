@@ -26,21 +26,6 @@ static void consumeHeaderTouchEvent(lv_event_t *e) {
   }
 }
 
-static bool headerTouchHitsOtaZone(lv_event_t *e) {
-  lv_indev_t *indev = lv_indev_get_act();
-  if (indev == nullptr) {
-    return false;
-  }
-
-  lv_point_t point;
-  lv_indev_get_point(indev, &point);
-
-  lv_area_t coords;
-  lv_obj_get_coords(lv_event_get_target(e), &coords);
-  lv_coord_t localX = point.x - coords.x1;
-  return localX >= UI_HEADER_OTA_TOUCH_ZONE_X1 && localX <= UI_HEADER_OTA_TOUCH_ZONE_X2;
-}
-
 static void headerTouchOverlayEventCb(lv_event_t *e) {
   consumeHeaderTouchEvent(e);
 
@@ -49,11 +34,19 @@ static void headerTouchOverlayEventCb(lv_event_t *e) {
     return;
   }
 
-  if (!headerTouchHitsOtaZone(e)) {
+  lv_indev_t *indev = lv_indev_get_act();
+  if (indev == nullptr) {
     return;
   }
+  lv_point_t point;
+  lv_indev_get_point(indev, &point);
+  lv_area_t coords;
+  lv_obj_get_coords(lv_event_get_target(e), &coords);
+  lv_coord_t localX = point.x - coords.x1;
 
-  showOtaPopup();
+  if (localX >= UI_HEADER_OTA_TOUCH_ZONE_X1 && localX <= UI_HEADER_OTA_TOUCH_ZONE_X2) {
+    showOtaPopup();
+  }
 }
 
 static bool lastWifiOnline = false;
@@ -363,8 +356,11 @@ void createDashboardHeader(lv_obj_t *parent) {
   lv_obj_set_size(leftWrap, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_align(leftWrap, LV_ALIGN_LEFT_MID, 0, 0);
   lv_obj_set_style_pad_all(leftWrap, 0, 0);
+  lv_obj_set_style_pad_gap(leftWrap, 4, 0);
   lv_obj_set_style_bg_opa(leftWrap, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(leftWrap, 0, 0);
+  lv_obj_set_flex_flow(leftWrap, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(leftWrap, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(leftWrap, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(leftWrap, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(leftWrap, consumeHeaderTouchEvent, LV_EVENT_ALL, nullptr);

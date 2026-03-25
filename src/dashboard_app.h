@@ -143,12 +143,29 @@ struct OtaState {
   char applyStatusText[96] = {};
 };
 
+struct SettingsState {
+  bool energyScheduleEnabled = false;
+  uint8_t activeStartHour = 7;
+  uint8_t activeStartMinute = 0;
+  uint8_t activeEndHour = 23;
+  uint8_t activeEndMinute = 0;
+  bool tapWakeEnabled = true;
+  uint8_t inactivityTimeoutMinutes = 5;
+  bool wifiEnabled = true;
+  bool weatherEnabled = true;
+  bool newsEnabled = true;
+  uint8_t brightnessLevel = 100;
+  // 0=solo display off, 1=display+Wi-Fi off, 2=deep sleep (futuro)
+  uint8_t powerMode = 1;
+};
+
 struct AppState {
   ClockState clock;
   BatteryState battery;
   WeatherState weather;
   NewsState news;
   OtaState ota;
+  SettingsState settings;
   int currentModuleIndex = 0;
   unsigned long lastSafeHeartbeatMs = 0;
   std::atomic<uint32_t> uiDirtyMask{UI_DIRTY_ALL};
