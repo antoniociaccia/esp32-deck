@@ -21,6 +21,7 @@ static void clearOtaManifestState() {
   app.ota.remoteVersion[0] = '\0';
   app.ota.remoteBuild[0] = '\0';
   app.ota.remoteBinUrl[0] = '\0';
+  app.ota.remoteSha256[0] = '\0';
 }
 
 static void setOtaApplyState(OtaApplyState state, int progressPercent, int errorCode, const char *statusText) {
@@ -117,6 +118,7 @@ void updateOtaManifestCheck() {
   strlcpy(app.ota.remoteVersion, manifest.version, sizeof(app.ota.remoteVersion));
   strlcpy(app.ota.remoteBuild, manifest.build, sizeof(app.ota.remoteBuild));
   strlcpy(app.ota.remoteBinUrl, manifest.binUrl, sizeof(app.ota.remoteBinUrl));
+  strlcpy(app.ota.remoteSha256, manifest.sha256, sizeof(app.ota.remoteSha256));
 
   snap.commitIfChanged("OTA");
 }

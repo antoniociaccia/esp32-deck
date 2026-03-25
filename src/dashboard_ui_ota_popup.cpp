@@ -149,6 +149,7 @@ void destroyOtaPopup() {
     lv_obj_del(ui.otaPopupOverlay);
     ui.otaPopupOverlay = nullptr;
     ui.otaPopupBodyLabel = nullptr;
+    ui.otaPopupProgressBar = nullptr;
     ui.otaPopupActionButton = nullptr;
     ui.otaPopupActionLabel = nullptr;
     if (ui.headerTouchOverlay != nullptr) {
@@ -178,6 +179,7 @@ static void otaPopupDeletedEventCb(lv_event_t *e) {
   LV_UNUSED(e);
   ui.otaPopupOverlay = nullptr;
   ui.otaPopupBodyLabel = nullptr;
+  ui.otaPopupProgressBar = nullptr;
   ui.otaPopupActionButton = nullptr;
   ui.otaPopupActionLabel = nullptr;
 }
@@ -193,6 +195,16 @@ void refreshOtaPopupUi() {
 
   if (ui.otaPopupActionButton == nullptr || ui.otaPopupActionLabel == nullptr) {
     return;
+  }
+
+  if (ui.otaPopupProgressBar != nullptr) {
+    if (app.ota.applyState == OTA_APPLY_IN_PROGRESS || app.ota.applyState == OTA_APPLY_SUCCESS) {
+      lv_obj_clear_flag(ui.otaPopupProgressBar, LV_OBJ_FLAG_HIDDEN);
+      int percent = app.ota.applyProgressPercent >= 0 ? app.ota.applyProgressPercent : 0;
+      lv_bar_set_value(ui.otaPopupProgressBar, percent, LV_ANIM_ON);
+    } else {
+      lv_obj_add_flag(ui.otaPopupProgressBar, LV_OBJ_FLAG_HIDDEN);
+    }
   }
 
   if (app.ota.applyState == OTA_APPLY_IN_PROGRESS || app.ota.applyState == OTA_APPLY_SUCCESS) {
@@ -311,6 +323,17 @@ void showOtaPopup() {
   setDashboardLabelFont(ui.otaPopupBodyLabel, &lv_font_montserrat_12);
   setDashboardLabelColor(ui.otaPopupBodyLabel, UI_COLOR_TEXT_SECONDARY);
   lv_obj_align(ui.otaPopupBodyLabel, LV_ALIGN_TOP_LEFT, 0, 30);
+
+  ui.otaPopupProgressBar = lv_bar_create(panel);
+  lv_obj_set_size(ui.otaPopupProgressBar, 220, 16);
+  lv_obj_align(ui.otaPopupProgressBar, LV_ALIGN_BOTTOM_LEFT, 0, -42);
+  lv_obj_set_style_bg_color(ui.otaPopupProgressBar, colorFromHex(0x1E293B), 0);
+  lv_obj_set_style_bg_color(ui.otaPopupProgressBar, colorFromHex(UI_COLOR_ACCENT), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(ui.otaPopupProgressBar, 8, 0);
+  lv_obj_set_style_radius(ui.otaPopupProgressBar, 8, LV_PART_INDICATOR);
+  lv_bar_set_range(ui.otaPopupProgressBar, 0, 100);
+  lv_bar_set_value(ui.otaPopupProgressBar, 0, LV_ANIM_OFF);
+  lv_obj_add_flag(ui.otaPopupProgressBar, LV_OBJ_FLAG_HIDDEN);
 
   ui.otaPopupActionButton = lv_btn_create(panel);
   lv_obj_set_size(ui.otaPopupActionButton, 96, 30);

@@ -80,6 +80,7 @@ struct UiRefs {
   lv_obj_t *moduleMetaLabels[UI_MODULE_COUNT] = {nullptr};
   lv_obj_t *otaPopupOverlay = nullptr;
   lv_obj_t *otaPopupBodyLabel = nullptr;
+  lv_obj_t *otaPopupProgressBar = nullptr;
   lv_obj_t *otaPopupActionButton = nullptr;
   lv_obj_t *otaPopupActionLabel = nullptr;
 };
@@ -131,6 +132,7 @@ struct OtaState {
   char remoteVersion[OTA_VERSION_MAX_LEN] = {};
   char remoteBuild[OTA_BUILD_MAX_LEN] = {};
   char remoteBinUrl[OTA_BIN_URL_MAX_LEN] = {};
+  char remoteSha256[OTA_SHA256_MAX_LEN] = {};
   bool applyRequested = false;
   OtaApplyState applyState = OTA_APPLY_IDLE;
   int applyProgressPercent = -1;
