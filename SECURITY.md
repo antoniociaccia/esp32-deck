@@ -22,3 +22,12 @@ This repository does not track runtime secrets.
 ## Supported versions
 
 There is currently a single active line of development on `main`.
+
+## OTA Updates
+
+Over-The-Air (OTA) firmware updates are implemented with the following minimum security policy:
+- **Transport**: All OTA metadata (`manifest.json`) and binary payloads (`.bin`) MUST be fetched over HTTPS.
+- **Verification**: The device MUST verify the expected `board` and `channel` before accepting an update.
+- **Downgrade protection**: The device MUST reject any update where the remote version is older than or equal to the currently installed version.
+- **Integrity**: Full SHA256 validation post-flash is not currently supported by `HTTPUpdate`. The manifest securely transports the SHA256 checksum, which is logged for diagnostic purposes pending future implementation of fully validated flash writing.
+- **State**: The device MUST NOT start an update if the battery level is below the minimum required by the manifest, or if the binary size exceeds the OTA partition size.
