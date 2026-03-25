@@ -22,6 +22,7 @@ c++ \
   -Wall \
   -Wextra \
   -I"$REPO_DIR/tests/include" \
+  -I"$REPO_DIR/tests/stubs" \
   -I"$REPO_DIR/src" \
   -I"$REPO_DIR" \
   "$REPO_DIR/tests/test_main.cpp" \
