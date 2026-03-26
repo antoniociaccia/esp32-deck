@@ -1,23 +1,33 @@
 # esp32-deck
 
-ESP32-S3 dashboard for the Freenove 2.8 inch touch display (`240x320`, used in landscape `320x240`).
+Dashboard touch per `ESP32-S3` pensata per la `Freenove ESP32-S3 Display 2.8` con interfaccia `LVGL`, meteo via OpenWeather, ticker news remoto e supporto OTA.
 
-Current features:
+Il progetto usa il display in orientamento landscape (`320x240`) e integra:
 
-- LVGL-based UI
-- capacitive touch with `FT6336U`
-- NTP clock
-- battery reading via ADC
-- weather via OpenWeather
-- continuous news ticker in the footer
+- UI basata su `LVGL`
+- touch capacitivo con `FT6336U`
+- sincronizzazione oraria via `NTP`
+- lettura batteria via `ADC`
+- meteo via `OpenWeather`
+- ticker news continuo nel footer
+- controllo aggiornamenti firmware OTA
 
-## Hardware
+## A chi serve
 
-Target board:
+Questa documentazione e pensata per sviluppatori e maker che vogliono:
 
-- Freenove ESP32-S3 Display 2.8
+- compilare e caricare il firmware sulla board supportata
+- configurare i servizi esterni necessari
+- capire la struttura del codice prima di modificarlo
+- verificare il comportamento locale con test e profili di debug
 
-Main libraries:
+## Hardware e dipendenze
+
+Board target:
+
+- `Freenove ESP32-S3 Display 2.8`
+
+Librerie principali:
 
 - `TFT_eSPI`
 - `lvgl`
@@ -25,80 +35,133 @@ Main libraries:
 - `WiFi.h`
 - `HTTPClient`
 
-## Project structure
+Configurazioni repository-owned:
 
-- [news.ino](news.ino): Arduino entrypoint
-- [src/](src): application code split by runtime, UI, services, battery, display
-- [src/version.h](src/version.h): current firmware version, channel, board id
-- [src/dashboard_ota.h](src/dashboard_ota.h): OTA manifest contract and version comparison helpers
-- [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h): repository-owned display setup for CI and releases
-- [lib/FT6336U_CTP_Controller](lib/FT6336U_CTP_Controller): vendored touch controller library
-- [scripts/build-ota-release.sh](scripts/build-ota-release.sh): OTA release build helper
-- [scripts/release-tag.sh](scripts/release-tag.sh): one-command tag and push helper for OTA releases
-- [assets/weather-icons/](assets/weather-icons): source weather icons
-- [flash.sh](flash.sh): compile and upload helper
-- [flash-monitor.sh](flash-monitor.sh): upload and serial monitor helper
-- [partitions.csv](partitions.csv): current flash layout
-- [secrets.example.h](secrets.example.h): local secrets template
+- [`lib/TFT_eSPI/User_Setup.h`](/Users/antoniociaccia/Documents/Arduino/news/lib/TFT_eSPI/User_Setup.h)
+- [`lv_conf.h`](/Users/antoniociaccia/Documents/Arduino/news/lv_conf.h)
+- [`lib/FT6336U_CTP_Controller`](/Users/antoniociaccia/Documents/Arduino/news/lib/FT6336U_CTP_Controller)
 
-## Setup
+## Quick Start
 
-1. Copy [secrets.example.h](secrets.example.h) to `secrets.h`.
-2. Fill in:
-   - `WIFI_SSID`
-   - `WIFI_PASSWORD`
-   - `OPENWEATHER_API_KEY`
-   - `WEATHER_CITY_LABEL`
-   - `WEATHER_LATITUDE`
-   - `WEATHER_LONGITUDE`
-   - `NEWS_API_URL`
-   - `NEWS_API_KEY`
-   - `OTA_MANIFEST_URL`
+### 1. Configura i segreti locali
 
-Suggested OTA manifest URL when using GitHub Releases in this repository:
+Duplica [`secrets.example.h`](/Users/antoniociaccia/Documents/Arduino/news/secrets.example.h) in `secrets.h` e compila i campi richiesti:
+
+- `WIFI_SSID`
+- `WIFI_PASSWORD`
+- `OPENWEATHER_API_KEY`
+- `WEATHER_CITY_LABEL`
+- `WEATHER_LATITUDE`
+- `WEATHER_LONGITUDE`
+- `NEWS_API_URL`
+- `NEWS_API_KEY`
+- `OTA_MANIFEST_URL`
+
+`secrets.h` resta locale e non deve essere versionato.
+
+Manifest OTA consigliato se usi GitHub Releases in questo repository:
 
 - `https://github.com/antoniociaccia/esp32-deck/releases/latest/download/manifest-stable.json`
 
-`secrets.h` is ignored by Git.
+### 2. Prepara l'ambiente Arduino
 
-## Build and flash
+Lo script di build applica automaticamente:
 
-Target FQBN:
+- configurazione `LVGL`
+- setup `TFT_eSPI`
+- librerie locali vendorizzate
+
+Se vuoi installarle manualmente:
+
+- `bash ./scripts/install-lvgl-config.sh`
+- `bash ./scripts/install-repo-libraries.sh`
+- `bash ./scripts/apply-tftespi-setup.sh`
+
+### 3. Compila
+
+FQBN usato dal progetto:
 
 - `esp32:esp32:esp32s3`
 
-Useful commands:
+Comandi principali:
 
 - `./flash.sh`
-- `./flash.sh --clean`
 - `./flash.sh --build-only`
+- `./flash.sh --clean`
 - `./flash.sh --upload-only`
-- `./flash.sh --ota-layout --build-only`
 - `./flash.sh --port /dev/cu.usbmodem14301`
+
+### 4. Carica e monitora
+
+- `./flash.sh`
 - `./flash-monitor.sh`
-- `bash ./scripts/release-tag.sh`
 
-Notes:
+Gli script gestiscono cache di build, rilevamento della porta seriale e controllo della porta occupata.
 
-- build output is cached for incremental builds
-- upload can be separated from compile
-- `--ota-layout` compiles against [partitions_ota.csv](partitions_ota.csv) without replacing the default layout
-- the scripts detect a busy serial port and show the owning process
-- the scripts force `build.cdc_on_boot=1` for ESP32-S3 USB serial at runtime
+## Servizi esterni richiesti
 
-## Debug
+### Meteo
 
-Serial logging is controlled in [src/config_debug.h](src/config_debug.h).
+Provider:
 
-Default behavior uses the production profile, with application logs disabled.
-For local debugging, switch `DEBUG_PROFILE` to `DEBUG_PROFILE_DEVELOPMENT`.
+- `OpenWeather`
 
-For local network-state simulation, use the test constants in [src/config_debug.h](src/config_debug.h):
+Dettagli:
+
+- trasporto `HTTPS`
+- query per coordinate geografiche
+- lingua risposta impostata a `it`
+
+### News
+
+Provider previsto:
+
+- endpoint HTTP custom, tipicamente un webhook `n8n`
+
+Contratto atteso:
+
+- header `X-API-Key`
+- payload con `items[].text`
+
+### OTA
+
+Il device legge un manifest remoto da `OTA_MANIFEST_URL` e verifica:
+
+- board compatibile
+- canale di release
+- disponibilita di una versione piu recente
+- soglia minima batteria
+- dimensione firmware compatibile con lo slot OTA
+
+## Flusso di sviluppo
+
+Per un ciclo di sviluppo tipico:
+
+1. aggiorna `secrets.h`
+2. esegui `./flash.sh --build-only`
+3. se il comportamento runtime cambia, carica il firmware sulla board
+4. verifica seriale e UI su hardware reale
+
+Per dettagli di contribuzione vedi [`CONTRIBUTING.md`](/Users/antoniociaccia/Documents/Arduino/news/CONTRIBUTING.md).
+
+## Debug e simulazione locale
+
+La diagnostica seriale e controllata da [`src/config_debug.h`](/Users/antoniociaccia/Documents/Arduino/news/src/config_debug.h).
+
+Profilo predefinito:
+
+- produzione, con log applicativi ridotti
+
+Per sviluppo locale:
+
+- imposta `DEBUG_PROFILE` su `DEBUG_PROFILE_DEVELOPMENT`
+
+Per simulare stati rete senza backend reali:
 
 - `DEBUG_WEATHER_TEST_MODE`
 - `DEBUG_NEWS_TEST_MODE`
 
-Available modes:
+Modalita disponibili:
 
 - `NETWORK_TEST_MODE_DISABLED`
 - `NETWORK_TEST_MODE_OFFLINE`
@@ -108,68 +171,87 @@ Available modes:
 - `NETWORK_TEST_MODE_INVALID_PAYLOAD`
 - `NETWORK_TEST_MODE_SUCCESS_MOCK`
 
-## Display setup note
+## Test
 
-The board-specific `TFT_eSPI` setup used by this project is now stored in the repository at [lib/TFT_eSPI/User_Setup.h](lib/TFT_eSPI/User_Setup.h).
+I test parser e logica sono sotto [`tests/`](/Users/antoniociaccia/Documents/Arduino/news/tests).
 
-For local environments you can apply it with:
+Runner disponibile:
 
-- `bash ./scripts/apply-tftespi-setup.sh`
-- `bash ./scripts/install-lvgl-config.sh`
+- `bash ./tests/run-parser-tests.sh`
 
-The touch controller dependency is also vendored in the repository and can be copied into the Arduino sketchbook libraries with:
+Il runner compila test C++ locali per:
 
-- `bash ./scripts/install-repo-libraries.sh`
+- parsing meteo
+- parsing news
+- OTA
+- UI state
+- servizi
+- utility
+- batteria
 
-## Flash layout
+Nota: `doctest.h` deve essere presente in `tests/include/`.
 
-The current [partitions.csv](partitions.csv) uses a single large app slot on a `4MB` flash configuration.
+## Layout flash
 
-That keeps more space for the firmware today, but it is not yet an OTA-ready dual-slot layout.
+Il repository include due layout:
 
-A candidate OTA layout is available in [partitions_ota.csv](partitions_ota.csv), with two `0x1E0000` OTA slots and `otadata`.
+- [`partitions.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions.csv): layout principale
+- [`partitions_ota.csv`](/Users/antoniociaccia/Documents/Arduino/news/partitions_ota.csv): layout compatibile con dual-slot OTA
 
-## OTA
+Per verificare il budget firmware sul layout OTA:
 
-The repository now includes the OTA groundwork and the first end-to-end GitHub release flow:
+- `./flash.sh --partitions-file ./partitions_ota.csv --build-only`
 
-- [src/version.h](src/version.h) exposes the current firmware version metadata
-- [src/dashboard_ota.h](src/dashboard_ota.h) and `dashboard_ota.cpp` define the manifest contract
-- the OTA helpers now distinguish `invalid`, `board`, `channel`, `up-to-date`, `slot`, `battery-low` and `available`
-- `updateOtaManifestCheck()` now performs a read-only HTTPS manifest check against `OTA_MANIFEST_URL`
-- the popup in the header can now start the OTA apply flow on device
-- `./flash.sh --ota-layout --build-only` verifies that the current firmware fits the OTA slot budget
-- [.github/workflows/release-ota.yml](.github/workflows/release-ota.yml) builds OTA release assets on Git tags and publishes:
-  - a versioned firmware binary such as `esp32-deck-esp32s3-v0.1.0.bin`
-  - a stable manifest asset `manifest-stable.json`
+## Release OTA
 
-Release flow:
+Elementi coinvolti:
 
-1. update [src/version.h](src/version.h)
-2. commit and push `main`
-3. trigger `Release OTA` from GitHub Actions (`workflow_dispatch`) or run `bash ./scripts/release-tag.sh`
-4. wait for `Release OTA` in GitHub Actions
+- [`src/version.h`](/Users/antoniociaccia/Documents/Arduino/news/src/version.h): versione firmware, canale, board id
+- [`src/dashboard_ota.h`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_ota.h): contratto manifest e helper OTA
+- [`scripts/build-ota-release.sh`](/Users/antoniociaccia/Documents/Arduino/news/scripts/build-ota-release.sh)
+- [`scripts/release-tag.sh`](/Users/antoniociaccia/Documents/Arduino/news/scripts/release-tag.sh)
+- [`.github/workflows/release-ota.yml`](/Users/antoniociaccia/Documents/Arduino/news/.github/workflows/release-ota.yml)
 
-## External APIs
+Flusso tipico:
 
-Weather:
+1. aggiorna [`src/version.h`](/Users/antoniociaccia/Documents/Arduino/news/src/version.h)
+2. esegui commit e push
+3. lancia `Release OTA` da GitHub Actions oppure `bash ./scripts/release-tag.sh`
+4. attendi la pubblicazione del `.bin` e del manifest stabile
 
-- provider: OpenWeather
-- transport: HTTPS
+## Struttura del progetto
 
-News:
+Punti di ingresso e moduli principali:
 
-- provider: custom `n8n` webhook
-- auth header: `X-API-Key`
-- expected payload: `items[].text`
+- [`news.ino`](/Users/antoniociaccia/Documents/Arduino/news/news.ino): entrypoint Arduino
+- [`src/dashboard_app.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_app.cpp): stato applicativo, parser e utility condivise
+- [`src/dashboard_runtime.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_runtime.cpp): loop runtime e orchestrazione
+- [`src/dashboard_ui_main.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_ui_main.cpp): vista principale
+- [`src/dashboard_ui_header.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_ui_header.cpp): header e stato servizi
+- [`src/dashboard_ui_footer.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_ui_footer.cpp): ticker footer
+- [`src/dashboard_services_weather.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_services_weather.cpp): fetch e parsing meteo
+- [`src/dashboard_services_news.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_services_news.cpp): fetch e parsing news
+- [`src/dashboard_battery.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/dashboard_battery.cpp): lettura batteria
+- [`src/display.cpp`](/Users/antoniociaccia/Documents/Arduino/news/src/display.cpp): bootstrap display e bridge grafico
 
-## Status
+Una spiegazione piu dettagliata e disponibile in [`docs/architecture.md`](/Users/antoniociaccia/Documents/Arduino/news/docs/architecture.md).
 
-Stable baseline:
+## Documenti correlati
 
-- display ok
-- touch ok
-- LVGL ok
-- Wi-Fi ok
+- [`CONTRIBUTING.md`](/Users/antoniociaccia/Documents/Arduino/news/CONTRIBUTING.md)
+- [`SECURITY.md`](/Users/antoniociaccia/Documents/Arduino/news/SECURITY.md)
+- [`BUGS.md`](/Users/antoniociaccia/Documents/Arduino/news/BUGS.md)
+- [`examples/OTA_DESIGN.md`](/Users/antoniociaccia/Documents/Arduino/news/examples/OTA_DESIGN.md)
+- [`examples/OPTIMIZATIONS.md`](/Users/antoniociaccia/Documents/Arduino/news/examples/OPTIMIZATIONS.md)
 
-Current next steps are local and intentionally kept out of the public repo backlog for now.
+## Stato corrente
+
+Baseline stabile:
+
+- display operativo
+- touch operativo
+- `LVGL` operativo
+- Wi-Fi operativo
+- meteo integrato
+- ticker news integrato
+- controllo OTA disponibile
